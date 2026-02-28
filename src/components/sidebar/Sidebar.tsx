@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { TeamView } from "../team/TeamView";
 import type { Project, AppSettings, ApproveMode } from "@/types";
 
@@ -79,9 +80,12 @@ function ProjectList({
     const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({ directory: true, title: "Open Project Folder" });
     if (selected) {
+      const path = selected as string;
+      // Sync project dir with Rust backend so file listing works
+      await invoke("set_project_dir", { path });
       onSelect({
-        path: selected as string,
-        name: (selected as string).split("/").pop() || "project",
+        path,
+        name: path.split("/").pop() || "project",
         lastOpened: Date.now(),
         hasClaudeConfig: false,
       });

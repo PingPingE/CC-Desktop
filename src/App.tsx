@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Sidebar } from "./components/sidebar/Sidebar";
+import { HeaderBar } from "./components/header/HeaderBar";
+import { FileSidebar } from "./components/file-sidebar/FileSidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
-import { FileTreePanel } from "./components/file-tree/FileTreePanel";
-import { TerminalPanel } from "./components/terminal/TerminalPanel";
+import { ActivityBar } from "./components/activity/ActivityBar";
 import { PermissionDialog } from "./components/permissions/PermissionDialog";
 import { OnboardingScreen } from "./components/settings/OnboardingScreen";
 import type { Project, AppSettings, ProcessState, PermissionRequest } from "./types";
@@ -12,11 +12,11 @@ function App() {
   const [claudeInstalled, setClaudeInstalled] = useState<boolean | null>(null);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [processState, setProcessState] = useState<ProcessState>("idle");
+  const [activityText, setActivityText] = useState("");
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
-  const [showFileTree, setShowFileTree] = useState(true);
-  const [showTerminal, setShowTerminal] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>({
-    theme: "dark",
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings] = useState<AppSettings>({
+    theme: "light",
     fontSize: 14,
     approveMode: "ask-every-time",
     showFileTree: true,
@@ -32,7 +32,11 @@ function App() {
 
   useEffect(() => { checkClaude(); }, [checkClaude]);
 
-  // Loading
+  const handleProjectSelect = useCallback(async (project: Project) => {
+    await invoke("set_project_dir", { path: project.path });
+    setCurrentProject(project);
+  }, []);
+
   if (claudeInstalled === null) {
     return (
       <div className="app-loading">
@@ -42,42 +46,34 @@ function App() {
     );
   }
 
-  // Onboarding
   if (claudeInstalled === false) {
     return <OnboardingScreen onRetry={checkClaude} />;
   }
 
   return (
     <div className="app-container" data-theme={settings.theme}>
-      {/* Left sidebar */}
-      <Sidebar
-        currentProject={currentProject}
-        onProjectSelect={setCurrentProject}
-        settings={settings}
-        onSettingsChange={setSettings}
+      <HeaderBar
+        project={currentProject}
+        processState={processState}
+        onOpenProject={handleProjectSelect}
+        onToggleSettings={() => setShowSettings(!showSettings)}
       />
 
-      {/* File tree (toggleable) */}
-      {showFileTree && currentProject && (
-        <FileTreePanel projectPath={currentProject.path} />
-      )}
+      <div className="app-body">
+        <FileSidebar project={currentProject} />
 
-      {/* Main column: chat + terminal */}
-      <div className="main-column">
-        <ChatPanel
-          project={currentProject}
-          processState={processState}
-          onProcessStateChange={setProcessState}
-          onToggleFileTree={() => setShowFileTree(!showFileTree)}
-          onToggleTerminal={() => setShowTerminal(!showTerminal)}
-          showFileTree={showFileTree}
-          showTerminal={showTerminal}
-        />
-
-        {showTerminal && <TerminalPanel />}
+        <div className="main-column">
+          <ChatPanel
+            project={currentProject}
+            processState={processState}
+            onProcessStateChange={setProcessState}
+            onActivityChange={setActivityText}
+          />
+        </div>
       </div>
 
-      {/* Permission dialog (modal) */}
+      <ActivityBar processState={processState} text={activityText} />
+
       {permissionRequest && (
         <PermissionDialog
           request={permissionRequest}
