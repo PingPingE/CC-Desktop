@@ -10,7 +10,6 @@
     "beforeDevCommand": "npm run dev"
   },
   "app": {
-    "title": "CC Desktop",
     "windows": [
       {
         "title": "CC Desktop",

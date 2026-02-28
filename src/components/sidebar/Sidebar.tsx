@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { Project, AppSettings } from "@/types";
+import { TeamView } from "../team/TeamView";
+import type { Project, AppSettings, ApproveMode } from "@/types";
 
 interface SidebarProps {
   currentProject: Project | null;
@@ -8,7 +9,7 @@ interface SidebarProps {
   onSettingsChange: (settings: AppSettings) => void;
 }
 
-type SidebarTab = "projects" | "agents" | "templates" | "settings";
+type SidebarTab = "projects" | "team" | "templates" | "settings";
 
 export function Sidebar({
   currentProject,
@@ -18,11 +19,11 @@ export function Sidebar({
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("projects");
 
-  const tabs: { id: SidebarTab; label: string; icon: string }[] = [
-    { id: "projects", label: "Projects", icon: "folder" },
-    { id: "agents", label: "Agents", icon: "users" },
-    { id: "templates", label: "Templates", icon: "package" },
-    { id: "settings", label: "Settings", icon: "settings" },
+  const tabs: { id: SidebarTab; label: string }[] = [
+    { id: "projects", label: "Projects" },
+    { id: "team", label: "Team" },
+    { id: "templates", label: "Templates" },
+    { id: "settings", label: "Settings" },
   ];
 
   return (
@@ -37,9 +38,8 @@ export function Sidebar({
             key={tab.id}
             className={`sidebar-tab ${activeTab === tab.id ? "active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
-            title={tab.label}
           >
-            <span className="sidebar-tab-icon">{tab.icon[0].toUpperCase()}</span>
+            {tab.label}
           </button>
         ))}
       </nav>
@@ -52,8 +52,8 @@ export function Sidebar({
             onSelect={onProjectSelect}
           />
         )}
-        {activeTab === "agents" && (
-          <AgentList project={currentProject} />
+        {activeTab === "team" && (
+          <TeamView projectPath={currentProject?.path ?? null} />
         )}
         {activeTab === "templates" && (
           <TemplateList />
@@ -83,7 +83,7 @@ function ProjectList({
         path: selected as string,
         name: (selected as string).split("/").pop() || "project",
         lastOpened: Date.now(),
-        hasClaudeConfig: false, // will be checked after selection
+        hasClaudeConfig: false,
       });
     }
   };
@@ -118,18 +118,6 @@ function ProjectList({
   );
 }
 
-function AgentList({ project }: { project: Project | null }) {
-  if (!project) {
-    return <p className="empty-state">Open a project to see agents</p>;
-  }
-  return (
-    <div className="panel-section">
-      <p className="text-muted">Agents from .claude/agents/</p>
-      {/* Will be populated by discover_agents command */}
-    </div>
-  );
-}
-
 function TemplateList() {
   const templates = [
     { name: "Startup Dev Team", price: "Free", url: "https://claudetemplate.com" },
@@ -141,6 +129,9 @@ function TemplateList() {
   return (
     <div className="panel-section">
       <h3>CC-Marketplace Templates</h3>
+      <p className="text-muted">
+        Templates are optional — CC Desktop works with any Claude Code project.
+      </p>
       {templates.map((t) => (
         <div key={t.name} className="template-item">
           <span className="template-name">{t.name}</span>
@@ -166,9 +157,49 @@ function SettingsPanel({
   settings: AppSettings;
   onChange: (s: AppSettings) => void;
 }) {
+  const approveModes: { value: ApproveMode; label: string; description: string }[] = [
+    {
+      value: "ask-every-time",
+      label: "Ask Every Time",
+      description: "You approve each action individually. Best for learning and reviewing unfamiliar code.",
+    },
+    {
+      value: "auto-approve-safe",
+      label: "Auto-Approve Safe Actions",
+      description: "File reads and searches run automatically. Edits and commands still ask. Good for daily development.",
+    },
+    {
+      value: "auto-approve-all",
+      label: "Auto-Approve Everything",
+      description: "All actions run without asking. Maximum speed for trusted projects. You can switch back anytime.",
+    },
+  ];
+
   return (
     <div className="panel-section">
       <h3>Settings</h3>
+
+      {/* Approve Mode */}
+      <div className="setting-group">
+        <h4>Permission Mode</h4>
+        {approveModes.map((mode) => (
+          <label key={mode.value} className="setting-radio">
+            <input
+              type="radio"
+              name="approveMode"
+              value={mode.value}
+              checked={settings.approveMode === mode.value}
+              onChange={() => onChange({ ...settings, approveMode: mode.value })}
+            />
+            <div className="radio-content">
+              <span className="radio-label">{mode.label}</span>
+              <span className="radio-desc">{mode.description}</span>
+            </div>
+          </label>
+        ))}
+      </div>
+
+      {/* Theme */}
       <label className="setting-row">
         <span>Theme</span>
         <select
@@ -182,6 +213,8 @@ function SettingsPanel({
           <option value="system">System</option>
         </select>
       </label>
+
+      {/* Font Size */}
       <label className="setting-row">
         <span>Font Size</span>
         <input

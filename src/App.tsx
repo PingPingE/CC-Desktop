@@ -18,6 +18,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>({
     theme: "dark",
     fontSize: 14,
+    approveMode: "ask-every-time",
     showFileTree: true,
     showAgentPanel: true,
     recentProjects: [],
@@ -30,7 +31,7 @@ function App() {
       .catch(() => setClaudeInstalled(false));
   }, []);
 
-  // Show onboarding if Claude Code is not installed
+  // Show loading screen
   if (claudeInstalled === null) {
     return (
       <div className="app-loading">
@@ -39,17 +40,22 @@ function App() {
     );
   }
 
+  // Show onboarding if Claude Code not found
   if (claudeInstalled === false) {
-    return <OnboardingScreen onRetry={() => {
-      invoke<boolean>("check_claude_code")
-        .then(setClaudeInstalled)
-        .catch(() => setClaudeInstalled(false));
-    }} />;
+    return (
+      <OnboardingScreen
+        onRetry={() => {
+          invoke<boolean>("check_claude_code")
+            .then(setClaudeInstalled)
+            .catch(() => setClaudeInstalled(false));
+        }}
+      />
+    );
   }
 
   return (
     <div className="app-container" data-theme={settings.theme}>
-      {/* Left sidebar: project, agents, templates */}
+      {/* Left sidebar: project, team, templates, settings */}
       <Sidebar
         currentProject={currentProject}
         onProjectSelect={setCurrentProject}
@@ -74,7 +80,7 @@ function App() {
       {/* Bottom terminal panel (toggleable) */}
       {showTerminal && <TerminalPanel />}
 
-      {/* Permission dialog (modal) */}
+      {/* Permission dialog (modal) — only shown when not auto-approved */}
       {permissionRequest && (
         <PermissionDialog
           request={permissionRequest}

@@ -4,9 +4,46 @@ A desktop application that brings Claude Code to everyone — no terminal requir
 
 CC Desktop wraps [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with a friendly chat UI, so you can use powerful AI-driven development workflows without ever opening a terminal or IDE.
 
+**For everyone** — works with any Claude Code project. No templates required. (Templates from [claudetemplate.com](https://claudetemplate.com) are optional power-ups.)
+
 **Built with:** [Tauri](https://tauri.app/) (Rust) + React + TypeScript
 
-**Templates from:** [claudetemplate.com](https://claudetemplate.com) (CC-Marketplace)
+---
+
+## Getting Started
+
+### 1. Install Prerequisites
+
+```bash
+# Install Claude Code (if you haven't already)
+npm install -g @anthropic-ai/claude-code
+
+# That's it. CC Desktop handles everything else.
+```
+
+> CC Desktop is a visual wrapper around Claude Code. If Claude Code works in your terminal, it works in CC Desktop. Your existing API key, settings, and projects carry over automatically.
+
+### 2. Install CC Desktop
+
+```bash
+# Clone and build from source
+git clone https://github.com/PingPingE/CC-Desktop.git
+cd CC-Desktop
+npm install
+npm run tauri dev      # Development mode
+npm run tauri build    # Build .dmg for macOS
+```
+
+### 3. Open a Project and Start
+
+1. Launch CC Desktop
+2. Click **"Open Project Folder"** — pick any folder
+3. Start typing in the chat — Claude Code responds with formatted Markdown
+4. Type `/` to see available slash commands (auto-discovered from your project)
+
+**Already have templates installed?** CC Desktop auto-discovers agents and skills from `.claude/` in your project.
+
+**Don't have templates?** No problem — CC Desktop works with plain Claude Code too. Templates just add pre-built agent teams.
 
 ---
 
@@ -19,19 +56,18 @@ Claude Code is incredibly powerful — it can plan features, write code, review 
 - There's no visual feedback on what's happening
 - Permission approvals happen in raw text
 
-**CC Desktop solves all of this** by putting a visual interface on top of Claude Code.
+**CC Desktop solves all of this.**
 
 | Without CC Desktop | With CC Desktop |
 |---|---|
 | Open terminal | Open app |
-| `npm install -g @anthropic-ai/claude-code` | One-time setup wizard |
 | `cd ~/projects/my-app` | Click "Open Project" |
 | `claude` | Already connected |
 | Type `/plan-feature add login` | Type or click `/plan-feature` |
-| Read raw text output | See formatted Markdown with syntax highlighting |
-| `y/n` permission prompts | Visual approve/deny dialog |
-| `git status` + `git diff` in another terminal | Built-in file tree with change indicators |
-| Switch between terminal tabs | Everything in one window |
+| Read raw text output | Formatted Markdown with syntax highlighting |
+| `y/n` permission prompts | Visual approve/deny dialog (or auto-approve) |
+| `git diff` in another terminal tab | File tree with change indicators |
+| Can't see which agent is working | Agent Activity tab shows the full team |
 
 ---
 
@@ -46,14 +82,14 @@ The main interaction with Claude Code, reimagined as a chat UI.
 │  CC Desktop                              ● Ready        │
 ├──────────┬──────────────────────────────────┬───────────┤
 │          │                                  │           │
-│  Projects│   assistant                      │  Agents   │
+│  Projects│   assistant                      │  Team     │
 │  --------│   I'll plan the login feature.   │  -------  │
 │  > my-app│   Here are the tasks:            │  PM       │
 │    blog  │                                  │  dev      │
 │          │   1. Create auth middleware      │  tester   │
-│  Agents  │   2. Build login page            │  ux       │
+│  Team    │   2. Build login page            │  ux       │
 │  --------│   3. Add session management      │           │
-│  pm      │   4. Write tests                 │  Skills   │
+│  PM      │   4. Write tests                 │  Skills   │
 │  dev     │                                  │  -------  │
 │  tester  │                                  │  /plan    │
 │          │   ┌──────────────────────────┐   │  /impl    │
@@ -73,7 +109,7 @@ The main interaction with Claude Code, reimagined as a chat UI.
 
 ### 2. Slash Command Palette
 
-Type `/` to see all available commands from your installed template.
+Type `/` to see all available commands, auto-discovered from your project.
 
 | Command | What it does |
 |---------|-------------|
@@ -83,18 +119,16 @@ Type `/` to see all available commands from your installed template.
 | `/refactor <target>` | Improve code structure without changing behavior |
 | `/auto-fix` | Automatically fix build/lint/type errors |
 | `/ship` | Full pre-ship verification (build + lint + types + tests) |
-| `/analyze-business <focus>` | Pricing and revenue analysis |
-| `/marketing <type>` | Generate marketing content |
 
-Commands are **auto-discovered** from `.claude/skills/` in your project — install different templates to get different commands.
+Commands come from `.claude/skills/` in your project. Install different templates to get different commands, or create your own.
 
-### 3. Permission Management
+### 3. Permission Management & Auto-Approve Mode
 
-When Claude Code needs to run a command, edit a file, or access the network, you get a **visual dialog** instead of a terminal prompt.
+When Claude Code needs to run a command or edit a file, you get a **visual dialog**:
 
 ```
 ┌─────────────────────────────────────┐
-│  ⚠ Permission Required             │
+│  Permission Required                │
 │                                     │
 │  Tool: bash                         │
 │  Command: npm run test              │
@@ -106,12 +140,71 @@ When Claude Code needs to run a command, edit a file, or access the network, you
 └─────────────────────────────────────┘
 ```
 
-- See exactly what Claude wants to do before approving
-- File edits show the diff before you approve
-- Bash commands show the full command
-- Never accidentally approve something you didn't mean to
+#### Auto-Approve Mode
 
-### 4. File Tree
+Don't want to click "Approve" every time? Toggle **Auto-Approve Mode** in Settings.
+
+| Mode | What happens | Best for |
+|------|-------------|----------|
+| **Ask Every Time** (default) | You approve each action individually | Learning, reviewing unfamiliar code |
+| **Auto-Approve Safe Actions** | File reads and searches run automatically, edits/commands ask | Daily development |
+| **Auto-Approve Everything** | All actions run without asking | Trusted projects, fast iteration |
+
+> "Auto-Approve Everything" is the equivalent of Claude Code's `--dangerously-skip-permissions` flag. Use it when you trust the project and want maximum speed. You can always switch back.
+
+### 4. Team View
+
+See your full agent team at a glance — who's on the team, what each agent does, and which model powers them.
+
+```
+┌─────────────────────────────────────┐
+│  Team Composition                   │
+├─────────────────────────────────────┤
+│                                     │
+│  product-manager          opus      │
+│  Plans features, breaks into tasks  │
+│                                     │
+│  draft-developer          sonnet    │
+│  Fast implementation, first pass    │
+│                                     │
+│  advanced-developer       opus      │
+│  Security review, code hardening    │
+│                                     │
+│  tester                   sonnet    │
+│  Test planning and QA               │
+│                                     │
+│  ux-designer              sonnet    │
+│  UX review and accessibility        │
+│                                     │
+│  Skills: 5 available                │
+│  /plan-feature /implement           │
+│  /code-review /refactor /ship       │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+- See all agents with their roles, models, and descriptions
+- See all available skills (slash commands)
+- Parsed directly from `.claude/agents/` and `.claude/skills/` YAML frontmatter
+- Works with any template or custom agent setup
+- Shows "No team configured" if using plain Claude Code (still works fine without agents)
+
+### 5. Remote Control
+
+Control Claude Code sessions on remote machines from your desktop.
+
+| Use case | How it works |
+|----------|-------------|
+| **Server development** | Connect to a cloud VM running Claude Code |
+| **Team collaboration** | Share a session link with teammates |
+| **Mobile monitoring** | Check progress from your phone (future) |
+
+- Connect via SSH tunnel or direct URL
+- See the same chat UI as local sessions
+- Full permission control — approve/deny from your desktop
+- Session persistence — reconnect without losing context
+
+### 6. File Tree
 
 Real-time view of your project structure, updated live as Claude creates and modifies files.
 
@@ -120,7 +213,7 @@ Real-time view of your project structure, updated live as Claude creates and mod
 - Navigate your project without switching to Finder/Explorer
 - Read-only in MVP (full editor planned for v2)
 
-### 5. Terminal Output
+### 7. Terminal Output
 
 Build results, test output, and command output appear in the bottom panel.
 
@@ -129,88 +222,72 @@ Build results, test output, and command output appear in the bottom panel.
 - Lint errors linked to file locations
 - Collapsible so it doesn't take up space when not needed
 
-### 6. Template Management
+### 8. Template Management (Optional)
 
-Browse, purchase, and install CC-Marketplace templates without leaving the app.
+Browse, purchase, and install CC-Marketplace templates — or use your own.
 
-**Browse:** See all available templates with descriptions, agent counts, and pricing.
+**CC Desktop works without any templates.** Templates are optional add-ons that give you pre-built agent teams:
 
-**Install:** Download a template ZIP, then drag it into the app or use "Install Template" to extract it into your project's `.claude/` directory.
+- **Browse** — See available templates from [claudetemplate.com](https://claudetemplate.com)
+- **Install** — Drag a template ZIP into the app, or click "Install Template"
+- **Discover** — After installing, agents and skills appear in the Team tab automatically
 
-**Discover:** After installing a template, the app automatically discovers all agents and skills and makes them available in the sidebar and command palette.
-
-### 7. Project Management
+### 9. Project Management
 
 - **Open any folder** as a project
 - **Recent projects** list for quick switching
 - **Auto-detect** installed templates and Claude Code configuration
 - **Multiple projects** — switch between projects without restarting
 
-### 8. Onboarding
+---
 
-First-time users see a step-by-step setup guide:
+## Who Is This For?
 
-1. **Install Claude Code** — with the exact command to run
-2. **Set up API key** — link to Anthropic console
-3. **Get a template** — link to claudetemplate.com
-4. **Open a project** — start working
+CC Desktop is for **everyone who uses Claude Code** — or wants to.
 
-No technical knowledge required. Each step has clear instructions and a "Check Again" button to verify completion.
+| User | Why CC Desktop |
+|------|---------------|
+| **Non-technical users** | Use Claude Code without learning terminal commands |
+| **Developers** | Faster workflow with visual permission dialogs and file tree |
+| **Team leads** | See team composition, share sessions via remote control |
+| **Template users** | Auto-discover agents/skills, easy template installation |
+| **Plain Claude Code users** | Better UI, same power — no templates needed |
 
 ---
 
-## Development Workflows Replicated
+## Development Workflows
 
-CC Desktop replicates every workflow you'd use in a terminal with Claude Code:
+CC Desktop replicates every workflow you'd use in a terminal:
 
 ### Feature Development
 
-| Step | Terminal | CC Desktop |
-|------|----------|-----------|
-| Plan | `claude` → `/plan-feature add user login` | Type `/plan-feature add user login` |
-| Implement | `claude` → `/implement login page with OAuth` | Type `/implement login page with OAuth` |
-| Review | `claude` → `/code-review src/auth/` | Type `/code-review src/auth/` |
-| Fix issues | `claude` → `/auto-fix` | Type `/auto-fix` |
-| Ship | `claude` → `/ship` | Type `/ship` |
-
-### Code Review Workflow
-
-| Step | Terminal | CC Desktop |
-|------|----------|-----------|
-| Start review | Type command in terminal | Type in chat |
-| See results | Raw text output | Formatted Markdown with severity badges |
-| Approve fixes | `y/n` prompts | Visual approve/deny dialogs |
-| See file changes | `git diff` in another tab | File tree with change indicators |
+```
+You:     /plan-feature add user login with OAuth
+         ↓
+PM:      Creates 5 tasks with priorities and dependencies
+         ↓
+You:     /implement task 1: create auth middleware
+         ↓
+Dev:     Writes code, creates files (visible in File Tree)
+         ↓
+You:     /code-review src/auth/
+         ↓
+Reviewer: Finds 2 security issues, suggests fixes
+         ↓
+You:     /ship
+         ↓
+Tester:  Runs build + lint + types + tests → all green
+```
 
 ### Template Installation
 
-| Step | Terminal | CC Desktop |
-|------|----------|-----------|
-| Browse | Open browser → claudetemplate.com | Click "Templates" in sidebar |
-| Purchase | Checkout on Lemonsqueezy | Same (opens in browser) |
-| Download | Download ZIP from email | Same |
-| Install | `unzip template.zip -d .claude/` | Drag ZIP into app, or click "Install Template" |
-| Verify | `ls .claude/agents/` | Agents appear in sidebar automatically |
-| Use | `claude` → `/plan-feature ...` | Type `/plan-feature ...` |
-
-### Git Workflow
-
-| Step | Terminal | CC Desktop |
-|------|----------|-----------|
-| See changes | `git status` + `git diff` | File tree shows modified files |
-| Commit | Claude runs `git commit` (you approve) | Same, with visual permission dialog |
-| Push | Claude runs `git push` (you approve) | Same, with visual permission dialog |
-| Create PR | Claude runs `gh pr create` (you approve) | Same, with visual permission dialog |
-
-### Debugging
-
-| Step | Terminal | CC Desktop |
-|------|----------|-----------|
-| Describe bug | Type in terminal | Type in chat |
-| See investigation | Raw text | Formatted steps with file references |
-| Approve file reads | `y/n` for each file | Visual dialog |
-| See fix | Raw diff | Formatted diff with syntax highlighting |
-| Run tests | `npm test` output in terminal | Test results in Terminal panel |
+| Step | CC Desktop |
+|------|-----------|
+| Browse | Click "Templates" in sidebar |
+| Purchase | Opens checkout in browser |
+| Install | Drag ZIP into app → auto-extracts to `.claude/` |
+| Verify | Agents appear in Team tab |
+| Use | Type `/plan-feature ...` |
 
 ---
 
@@ -223,52 +300,32 @@ CC Desktop replicates every workflow you'd use in a terminal with Claude Code:
 │  ┌────────────────────────────────────────┐  │
 │  │           React Frontend               │  │
 │  │                                        │  │
-│  │  Sidebar │ ChatPanel │ FileTree        │  │
-│  │  Input   │ Messages  │ Terminal        │  │
-│  │  Commands│ Permissions│ Settings       │  │
+│  │  Sidebar │ ChatPanel │ TeamView        │  │
+│  │  Input   │ Messages  │ FileTree        │  │
+│  │  Commands│ Permissions│ Terminal       │  │
+│  │  Settings│ AutoApprove│ Remote         │  │
 │  └──────────────┬─────────────────────────┘  │
 │                 │ Tauri IPC                  │
 │  ┌──────────────┴─────────────────────────┐  │
 │  │           Rust Backend                 │  │
 │  │                                        │  │
 │  │  • Claude Code process manager         │  │
-│  │    - Spawn `claude` CLI                │  │
+│  │    - Spawn local `claude` CLI          │  │
+│  │    - Connect to remote sessions        │  │
 │  │    - Stream stdout/stderr              │  │
-│  │    - Send stdin (user messages)        │  │
-│  │    - Handle process lifecycle          │  │
+│  │    - Auto-approve mode                 │  │
 │  │                                        │  │
 │  │  • File system watcher                 │  │
-│  │    - Watch project directory           │  │
-│  │    - Emit change events to frontend    │  │
-│  │                                        │  │
-│  │  • Template manager                    │  │
-│  │    - Extract ZIP to .claude/           │  │
-│  │    - Discover agents and skills        │  │
-│  │                                        │  │
+│  │  • Template ZIP extractor              │  │
+│  │  • Agent/skill frontmatter parser      │  │
 │  │  • Settings persistence               │  │
-│  │    - Theme, font size, recent projects │  │
 │  └────────────────────────────────────────┘  │
 │                 │                             │
 └─────────────────┼────────────────────────────┘
                   │
-                  ▼
           Claude Code CLI
-        (user's local install)
-                  │
-                  ▼
-          Anthropic API
-        (user's own API key)
+        (user's local install — already has API key configured)
 ```
-
-### Key Design Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Framework** | Tauri (not Electron) | 10-20x smaller bundle (~10MB vs ~200MB) |
-| **Claude Code integration** | Spawn CLI as child process | Respects CC's permission model, always up-to-date |
-| **Template source** | claudetemplate.com (CC-Marketplace) | Single source of truth for templates |
-| **API keys** | User's own key | No server costs, no middleman, user controls their data |
-| **Platform** | macOS first | Primary developer platform, Windows/Linux follow |
 
 ### Project Structure
 
@@ -285,26 +342,18 @@ CC-Desktop/
 │
 ├── src/                         # React frontend
 │   ├── components/
-│   │   ├── chat/                # Chat UI
-│   │   │   ├── ChatPanel.tsx    # Main chat view
-│   │   │   ├── ChatInput.tsx    # Input with slash command palette
-│   │   │   └── MessageBubble.tsx# Message rendering
-│   │   ├── sidebar/             # Left sidebar
-│   │   │   └── Sidebar.tsx      # Projects, agents, templates, settings
-│   │   ├── file-tree/           # File explorer
-│   │   │   └── FileTreePanel.tsx# Project file tree
-│   │   ├── terminal/            # Terminal output
-│   │   │   └── TerminalPanel.tsx# Build/test output
-│   │   ├── permissions/         # Permission dialogs
-│   │   │   └── PermissionDialog.tsx
-│   │   └── settings/            # Settings & onboarding
-│   │       └── OnboardingScreen.tsx
+│   │   ├── chat/                # Chat UI + slash command palette
+│   │   ├── sidebar/             # Projects, team, templates, settings
+│   │   ├── file-tree/           # Project file tree
+│   │   ├── terminal/            # Build/test output
+│   │   ├── permissions/         # Permission dialogs + auto-approve
+│   │   ├── team/                # Team composition view
+│   │   ├── remote/              # Remote session management
+│   │   └── settings/            # Settings + onboarding
 │   ├── hooks/                   # React hooks
 │   ├── lib/                     # Utilities
 │   ├── types/                   # TypeScript types
-│   │   └── index.ts             # All type definitions
-│   ├── styles/
-│   │   └── globals.css          # Global styles + theme variables
+│   ├── styles/                  # CSS with theme variables
 │   ├── App.tsx                  # Root component
 │   └── main.tsx                 # Entry point
 │
@@ -316,46 +365,9 @@ CC-Desktop/
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** 18+ — [Download](https://nodejs.org/)
-- **Rust** — [Install](https://rustup.rs/)
-- **Claude Code** — `npm install -g @anthropic-ai/claude-code`
-- **Anthropic API key** or Claude Pro/Max subscription
-
-### Development
-
-```bash
-# Clone the repo
-git clone https://github.com/PingPingE/CC-Desktop.git
-cd CC-Desktop
-
-# Install dependencies
-npm install
-
-# Run in development mode (opens the app with hot reload)
-npm run tauri dev
-
-# Build for production
-npm run tauri build
-```
-
-### Install a Template
-
-1. Go to [claudetemplate.com](https://claudetemplate.com)
-2. Get a template (Free or paid)
-3. Download the ZIP
-4. In CC Desktop, click "Install Template" and select the ZIP
-5. The app extracts it to your project's `.claude/` directory
-6. Agents and slash commands appear automatically
-
----
-
 ## Roadmap
 
-### v0.1 (Current) — Foundation
+### v0.1 — Foundation (Current)
 - [x] Project scaffolding (Tauri + React + TypeScript)
 - [x] Type definitions for all UI concepts
 - [x] Component stubs for all panels
@@ -363,37 +375,38 @@ npm run tauri build
 - [ ] Claude Code CLI process spawning and streaming
 - [ ] Full chat UI with Markdown rendering
 - [ ] Slash command palette with auto-discovery
-- [ ] Permission dialog integration
+- [ ] Permission dialog + auto-approve toggle
 - [ ] File tree with real-time updates
+- [ ] Team composition view
 
 ### v0.2 — Core Experience
-- [ ] Template ZIP installer
-- [ ] Git status indicators
+- [ ] Template ZIP installer (drag-and-drop)
+- [ ] Git status indicators in file tree
 - [ ] Terminal output panel
+- [ ] Agent frontmatter parser (model, description, tools)
 - [ ] Dark/light theme with system detection
 - [ ] Recent projects persistence
-- [ ] Agent activity visualization
 
-### v0.3 — Polish
+### v0.3 — Remote & Polish
+- [ ] Remote session connection (SSH tunnel)
 - [ ] macOS code signing and notarization
 - [ ] Auto-update mechanism
 - [ ] Keyboard shortcuts
 - [ ] Search in chat history
-- [ ] Export conversation
 
 ### v1.0 — Public Release
-- [ ] Windows support
-- [ ] Linux support
-- [ ] In-app template browser with purchase flow
+- [ ] Windows + Linux support
+- [ ] In-app template browser
 - [ ] Built-in file editor (basic)
-- [ ] Plugin system for custom panels
+- [ ] Session sharing (remote control link)
+- [ ] Plugin system
 
 ---
 
 ## Related Projects
 
 - **[CC-Marketplace](https://github.com/PingPingE/CC-Marketplace)** — Template marketplace website ([claudetemplate.com](https://claudetemplate.com))
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — The CLI tool that powers everything
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — The CLI tool that CC Desktop wraps
 
 ---
 
@@ -411,5 +424,3 @@ CC Desktop is open source. Contributions welcome!
 2. Create a feature branch
 3. Make your changes
 4. Open a PR
-
-For questions or feedback, open an issue on GitHub.

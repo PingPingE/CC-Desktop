@@ -51,6 +51,8 @@ export interface Agent {
   name: string;
   description?: string;
   model?: string;
+  tools?: string[];
+  permissionMode?: string;
   filePath: string;
 }
 
@@ -63,10 +65,17 @@ export interface FileNode {
   modified?: boolean;
 }
 
+/** Auto-approve mode for permissions */
+export type ApproveMode =
+  | "ask-every-time"     // Default: approve each action individually
+  | "auto-approve-safe"  // File reads/searches auto, edits/commands ask
+  | "auto-approve-all";  // Everything runs without asking (skip-permissions)
+
 /** App-wide settings */
 export interface AppSettings {
   theme: "light" | "dark" | "system";
   fontSize: number;
+  approveMode: ApproveMode;
   showFileTree: boolean;
   showAgentPanel: boolean;
   recentProjects: Project[];
@@ -110,4 +119,21 @@ export interface TemplateInfo {
   skills: number;
   checkoutUrl: string;
   installed: boolean;
+}
+
+/** Remote session connection */
+export interface RemoteSession {
+  id: string;
+  host: string;
+  port: number;
+  status: "connecting" | "connected" | "disconnected" | "error";
+  projectPath?: string;
+}
+
+/** Team composition — parsed from .claude/ directory */
+export interface TeamComposition {
+  agents: Agent[];
+  skills: Skill[];
+  hasTemplate: boolean;
+  templateName?: string;
 }
