@@ -51,7 +51,6 @@ function App() {
     await invoke("set_project_dir", { path: project.path });
     setCurrentProject(project);
 
-    // Update recent projects
     setRecentProjects((prev) => {
       const filtered = prev.filter((p) => p.path !== project.path);
       const updated = [{ ...project, lastOpened: Date.now() }, ...filtered].slice(0, MAX_RECENT);
@@ -71,6 +70,17 @@ function App() {
         hasClaudeConfig: false,
       });
     }
+  }, [handleProjectSelect]);
+
+  const handleCreateProject = useCallback(async (name: string) => {
+    const path = await invoke<string>("create_project", { name });
+    const projectName = path.split("/").pop() || name;
+    handleProjectSelect({
+      path,
+      name: projectName,
+      lastOpened: Date.now(),
+      hasClaudeConfig: false,
+    });
   }, [handleProjectSelect]);
 
   if (claudeInstalled === null) {
@@ -103,6 +113,7 @@ function App() {
             onProcessStateChange={setProcessState}
             onActivityChange={setActivityText}
             onOpenProject={handleOpenFolder}
+            onCreateProject={handleCreateProject}
             recentProjects={recentProjects}
             onSelectRecentProject={handleProjectSelect}
           />

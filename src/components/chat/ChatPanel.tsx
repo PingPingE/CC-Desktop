@@ -11,6 +11,7 @@ interface ChatPanelProps {
   onProcessStateChange: (state: ProcessState) => void;
   onActivityChange: (text: string) => void;
   onOpenProject: () => void;
+  onCreateProject: (name: string) => void;
   recentProjects: Project[];
   onSelectRecentProject: (project: Project) => void;
 }
@@ -21,6 +22,7 @@ export function ChatPanel({
   onProcessStateChange,
   onActivityChange,
   onOpenProject,
+  onCreateProject,
   recentProjects,
   onSelectRecentProject,
 }: ChatPanelProps) {
@@ -136,6 +138,7 @@ export function ChatPanel({
           <WelcomeScreen
             hasProject={!!project}
             onOpenProject={onOpenProject}
+            onCreateProject={onCreateProject}
             recentProjects={recentProjects}
             onSelectRecentProject={onSelectRecentProject}
           />
@@ -157,6 +160,7 @@ export function ChatPanel({
 interface WelcomeScreenProps {
   hasProject: boolean;
   onOpenProject: () => void;
+  onCreateProject: (name: string) => void;
   recentProjects: Project[];
   onSelectRecentProject: (project: Project) => void;
 }
@@ -164,48 +168,112 @@ interface WelcomeScreenProps {
 function WelcomeScreen({
   hasProject,
   onOpenProject,
+  onCreateProject,
   recentProjects,
   onSelectRecentProject,
 }: WelcomeScreenProps) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showCreate) inputRef.current?.focus();
+  }, [showCreate]);
+
+  const handleCreate = () => {
+    const name = projectName.trim();
+    if (!name) return;
+    onCreateProject(name);
+    setProjectName("");
+    setShowCreate(false);
+  };
+
+  if (hasProject) {
+    return (
+      <div className="welcome-screen">
+        <div className="welcome-icon">CC</div>
+        <h2>What do you want to build?</h2>
+        <p>Type a message below, or try a command:</p>
+        <div className="command-suggestions">
+          <code>/plan-feature</code>
+          <code>/implement</code>
+          <code>/code-review</code>
+          <code>/refactor</code>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="welcome-screen">
       <div className="welcome-icon">CC</div>
-      {!hasProject ? (
-        <>
-          <h2>Welcome to CC Desktop</h2>
-          <p>Open a project folder to start building with Claude Code.</p>
+      <h2>Welcome to CC Desktop</h2>
+      <p>Start something new, or continue where you left off.</p>
 
-          <button className="welcome-open-btn" onClick={onOpenProject}>
-            Open Project
-          </button>
+      <div className="welcome-actions">
+        {!showCreate ? (
+          <>
+            <button className="welcome-action-btn welcome-action-primary" onClick={() => setShowCreate(true)}>
+              <span className="welcome-action-icon">+</span>
+              <span className="welcome-action-text">
+                <strong>Start a new project</strong>
+                <span>Create a folder and start building from scratch</span>
+              </span>
+            </button>
 
-          {recentProjects.length > 0 && (
-            <div className="recent-projects">
-              <span className="recent-projects-label">Recent projects</span>
-              {recentProjects.map((p) => (
-                <button
-                  key={p.path}
-                  className="recent-project-item"
-                  onClick={() => onSelectRecentProject(p)}
-                >
-                  <span className="recent-project-name">{p.name}</span>
-                  <span className="recent-project-path">{p.path}</span>
-                </button>
-              ))}
+            <button className="welcome-action-btn" onClick={onOpenProject}>
+              <span className="welcome-action-icon">O</span>
+              <span className="welcome-action-text">
+                <strong>Open existing folder</strong>
+                <span>I already have a project folder</span>
+              </span>
+            </button>
+          </>
+        ) : (
+          <div className="welcome-create-form">
+            <label className="welcome-create-label">What are you building?</label>
+            <input
+              ref={inputRef}
+              className="welcome-create-input"
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setShowCreate(false); }}
+              placeholder='e.g. "My Portfolio Website"'
+            />
+            <p className="welcome-create-hint">
+              A folder will be created at ~/Documents/CC-Projects/
+            </p>
+            <div className="welcome-create-actions">
+              <button className="welcome-create-cancel" onClick={() => setShowCreate(false)}>
+                Cancel
+              </button>
+              <button
+                className="welcome-create-submit"
+                onClick={handleCreate}
+                disabled={!projectName.trim()}
+              >
+                Create & Start
+              </button>
             </div>
-          )}
-        </>
-      ) : (
-        <>
-          <h2>What do you want to build?</h2>
-          <p>Type a message below, or try a command:</p>
-          <div className="command-suggestions">
-            <code>/plan-feature</code>
-            <code>/implement</code>
-            <code>/code-review</code>
-            <code>/refactor</code>
           </div>
-        </>
+        )}
+      </div>
+
+      {recentProjects.length > 0 && (
+        <div className="recent-projects">
+          <span className="recent-projects-label">Recent</span>
+          {recentProjects.map((p) => (
+            <button
+              key={p.path}
+              className="recent-project-item"
+              onClick={() => onSelectRecentProject(p)}
+            >
+              <span className="recent-project-name">{p.name}</span>
+              <span className="recent-project-path">{p.path}</span>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

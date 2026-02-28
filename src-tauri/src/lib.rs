@@ -45,6 +45,44 @@ fn set_project_dir(state: State<AppState>, path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Create a new project directory under ~/Documents/CC-Projects/
+#[tauri::command]
+fn create_project(state: State<AppState>, name: String) -> Result<String, String> {
+    let home = std::env::var("HOME").map_err(|_| "Cannot find home directory".to_string())?;
+    let base = format!("{}/Documents/CC-Projects", home);
+
+    // Ensure base directory exists
+    std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+
+    // Sanitize name: lowercase, replace spaces with hyphens, remove special chars
+    let slug: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' { c } else if c == ' ' { '-' } else { '_' })
+        .collect();
+    let slug = if slug.is_empty() { "my-project".to_string() } else { slug };
+
+    let project_path = format!("{}/{}", base, slug);
+
+    // If already exists, append a number
+    let final_path = if std::path::Path::new(&project_path).exists() {
+        let mut i = 2;
+        loop {
+            let candidate = format!("{}-{}", project_path, i);
+            if !std::path::Path::new(&candidate).exists() {
+                break candidate;
+            }
+            i += 1;
+        }
+    } else {
+        project_path
+    };
+
+    std::fs::create_dir_all(&final_path).map_err(|e| e.to_string())?;
+    *state.project_dir.lock().unwrap() = Some(final_path.clone());
+    Ok(final_path)
+}
+
 /// List files in the project directory
 #[tauri::command]
 fn list_project_files(state: State<AppState>) -> Result<Vec<String>, String> {
@@ -256,6 +294,7 @@ pub fn run() {
             check_claude_code,
             get_project_dir,
             set_project_dir,
+            create_project,
             list_project_files,
             discover_skills,
             discover_agents,
