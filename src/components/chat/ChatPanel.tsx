@@ -58,29 +58,24 @@ export function ChatPanel({
       if (!assistantId) return;
 
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? {
-                ...m,
-                content: event.payload.full_output || m.content || "(No response)",
-                status: event.payload.success ? ("complete" as const) : ("error" as const),
-              }
-            : m
-        )
+        prev.map((m) => {
+          if (m.id !== assistantId) return m;
+          const finalContent = event.payload.full_output || m.content || "(No response)";
+          return {
+            ...m,
+            content: event.payload.success ? finalContent : `Error: ${finalContent}`,
+            status: event.payload.success ? ("complete" as const) : ("error" as const),
+          };
+        })
       );
-      onProcessStateChange("idle");
-      onActivityChange("");
+      onProcessStateChange(event.payload.success ? "idle" : "error");
+      onActivityChange(event.payload.success ? "" : "Something went wrong");
       currentAssistantIdRef.current = null;
-    });
-
-    const unlisten3 = listen<{ message: string }>("claude-error", () => {
-      // stderr from claude — usually progress info, not fatal errors
     });
 
     return () => {
       unlisten1.then((fn) => fn());
       unlisten2.then((fn) => fn());
-      unlisten3.then((fn) => fn());
     };
   }, [onProcessStateChange, onActivityChange]);
 

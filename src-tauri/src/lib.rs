@@ -348,11 +348,6 @@ struct ClaudeDoneEvent {
     full_output: String,
 }
 
-#[derive(Clone, Serialize)]
-struct ClaudeErrorEvent {
-    message: String,
-}
-
 /// Run a prompt through Claude Code CLI in print mode.
 /// Streams output via Tauri events.
 #[tauri::command]
@@ -374,11 +369,21 @@ async fn run_claude_prompt(
 
     let full_path = resolve_full_path();
 
-    // Spawn claude in print mode
+    // Build a clean environment — remove Claude Code internal vars
+    // to avoid "nested session" errors when dev server runs inside CC
+    let mut env_vars: std::collections::HashMap<String, String> = std::env::vars().collect();
+    env_vars.remove("CLAUDECODE");
+    env_vars.remove("CLAUDE_CODE_SESSION");
+    env_vars.remove("CLAUDE_CODE_ENTRY_POINT");
+    env_vars.remove("CLAUDE_CODE_PACKAGE_DIR");
+    env_vars.insert("PATH".to_string(), full_path);
+
+    // Spawn claude in print mode with clean environment
     let mut child = tokio::process::Command::new(&claude_bin)
         .args(["-p", &prompt])
         .current_dir(&dir)
-        .env("PATH", &full_path)
+        .env_clear()
+        .envs(&env_vars)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -390,13 +395,15 @@ async fn run_claude_prompt(
     let mut stdout_reader = BufReader::new(stdout).lines();
     let mut full_output = String::new();
 
-    // Read stderr in background
-    let app_clone = app.clone();
+    // Collect stderr in background
     let stderr_handle = tokio::spawn(async move {
         let mut stderr_reader = BufReader::new(stderr).lines();
+        let mut stderr_output = String::new();
         while let Ok(Some(line)) = stderr_reader.next_line().await {
-            let _ = app_clone.emit("claude-error", ClaudeErrorEvent { message: line });
+            stderr_output.push_str(&line);
+            stderr_output.push('\n');
         }
+        stderr_output
     });
 
     // Stream stdout line by line
@@ -408,13 +415,25 @@ async fn run_claude_prompt(
     }
 
     let status = child.wait().await.map_err(|e| e.to_string())?;
-    let _ = stderr_handle.await;
+    let stderr_output = stderr_handle.await.unwrap_or_default();
+
+    // If claude failed and stdout is empty, use stderr as error message
+    let final_output = if !status.success() && full_output.trim().is_empty() {
+        let err_msg = stderr_output.trim();
+        if !err_msg.is_empty() {
+            err_msg.to_string()
+        } else {
+            "Claude Code exited with an error.".to_string()
+        }
+    } else {
+        full_output.trim().to_string()
+    };
 
     app.emit(
         "claude-done",
         ClaudeDoneEvent {
             success: status.success(),
-            full_output: full_output.trim().to_string(),
+            full_output: final_output,
         },
     )
     .map_err(|e| e.to_string())?;
