@@ -81,8 +81,8 @@ fn collect_files(
             .to_string_lossy()
             .to_string();
 
-        // Skip hidden dirs and node_modules
-        if name.starts_with('.') || name == "node_modules" || name == "target" {
+        // Skip heavy/internal dirs only — show hidden files like .claude/, .gitignore, .env
+        if name == ".git" || name == "node_modules" || name == "target" || name == ".next" || name == "dist" {
             continue;
         }
 
