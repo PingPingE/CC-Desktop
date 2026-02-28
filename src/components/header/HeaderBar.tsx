@@ -3,29 +3,16 @@ import type { Project, ProcessState } from "@/types";
 interface HeaderBarProps {
   project: Project | null;
   processState: ProcessState;
-  onOpenProject: (project: Project) => void;
+  onOpenFolder: () => void;
   onToggleSettings: () => void;
 }
 
 export function HeaderBar({
   project,
   processState,
-  onOpenProject,
+  onOpenFolder,
   onToggleSettings,
 }: HeaderBarProps) {
-  const handleOpenFolder = async () => {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory: true, title: "Open Project Folder" });
-    if (selected) {
-      onOpenProject({
-        path: selected as string,
-        name: (selected as string).split("/").pop() || "project",
-        lastOpened: Date.now(),
-        hasClaudeConfig: false,
-      });
-    }
-  };
-
   const statusConfig: Record<ProcessState, { label: string; color: string }> = {
     idle: { label: "Ready", color: "var(--success)" },
     starting: { label: "Starting...", color: "var(--warning)" },
@@ -50,9 +37,7 @@ export function HeaderBar({
             <span className="header-project-path">{project.path}</span>
           </>
         ) : (
-          <button className="header-btn" onClick={handleOpenFolder}>
-            Open Project
-          </button>
+          <span className="header-no-project">No project open</span>
         )}
       </div>
 
@@ -61,11 +46,9 @@ export function HeaderBar({
           <span className="status-dot" style={{ backgroundColor: color }} />
           <span>{label}</span>
         </div>
-        {project && (
-          <button className="header-btn" onClick={handleOpenFolder}>
-            Switch
-          </button>
-        )}
+        <button className="header-btn" onClick={onOpenFolder}>
+          {project ? "Switch" : "Open"}
+        </button>
         <button className="header-btn" onClick={onToggleSettings}>
           Settings
         </button>

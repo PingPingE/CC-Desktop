@@ -195,6 +195,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.header-no-project {
+  font-size: 13px;
+  color: var(--text-muted);
+}
 
 .header-actions {
   display: flex;
@@ -410,6 +414,68 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: var(--text-muted);
   font-size: 14px;
   max-width: 380px;
+}
+
+/* Open Project button on welcome screen */
+.welcome-open-btn {
+  margin-top: 16px;
+  padding: 12px 32px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.welcome-open-btn:hover { background: var(--accent-hover); }
+
+/* Recent projects list */
+.recent-projects {
+  margin-top: 24px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.recent-projects-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.recent-project-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.recent-project-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+.recent-project-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.recent-project-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .command-suggestions {

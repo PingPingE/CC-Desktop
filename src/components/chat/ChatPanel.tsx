@@ -10,6 +10,9 @@ interface ChatPanelProps {
   processState: ProcessState;
   onProcessStateChange: (state: ProcessState) => void;
   onActivityChange: (text: string) => void;
+  onOpenProject: () => void;
+  recentProjects: Project[];
+  onSelectRecentProject: (project: Project) => void;
 }
 
 export function ChatPanel({
@@ -17,6 +20,9 @@ export function ChatPanel({
   processState,
   onProcessStateChange,
   onActivityChange,
+  onOpenProject,
+  recentProjects,
+  onSelectRecentProject,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -104,7 +110,6 @@ export function ChatPanel({
       try {
         await invoke("run_claude_prompt", { prompt: content });
       } catch (err) {
-        // invoke itself errored (e.g., claude not found)
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMessage.id
@@ -128,7 +133,12 @@ export function ChatPanel({
     <div className="chat-panel">
       <div className="chat-messages">
         {messages.length === 0 ? (
-          <WelcomeScreen hasProject={!!project} />
+          <WelcomeScreen
+            hasProject={!!project}
+            onOpenProject={onOpenProject}
+            recentProjects={recentProjects}
+            onSelectRecentProject={onSelectRecentProject}
+          />
         ) : (
           messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
         )}
@@ -144,14 +154,46 @@ export function ChatPanel({
   );
 }
 
-function WelcomeScreen({ hasProject }: { hasProject: boolean }) {
+interface WelcomeScreenProps {
+  hasProject: boolean;
+  onOpenProject: () => void;
+  recentProjects: Project[];
+  onSelectRecentProject: (project: Project) => void;
+}
+
+function WelcomeScreen({
+  hasProject,
+  onOpenProject,
+  recentProjects,
+  onSelectRecentProject,
+}: WelcomeScreenProps) {
   return (
     <div className="welcome-screen">
       <div className="welcome-icon">CC</div>
       {!hasProject ? (
         <>
           <h2>Welcome to CC Desktop</h2>
-          <p>Open a project folder to get started. Use the "Open Project" button above.</p>
+          <p>Open a project folder to start building with Claude Code.</p>
+
+          <button className="welcome-open-btn" onClick={onOpenProject}>
+            Open Project
+          </button>
+
+          {recentProjects.length > 0 && (
+            <div className="recent-projects">
+              <span className="recent-projects-label">Recent projects</span>
+              {recentProjects.map((p) => (
+                <button
+                  key={p.path}
+                  className="recent-project-item"
+                  onClick={() => onSelectRecentProject(p)}
+                >
+                  <span className="recent-project-name">{p.name}</span>
+                  <span className="recent-project-path">{p.path}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <>
