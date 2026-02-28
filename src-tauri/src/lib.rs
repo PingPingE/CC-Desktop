@@ -18,14 +18,46 @@ pub struct AppState {
     pub claude_code_installed: Mutex<bool>,
 }
 
+/// Resolve the full PATH including user shell paths.
+/// macOS GUI apps don't inherit terminal PATH, so we load it from the login shell.
+fn resolve_full_path() -> String {
+    // Try to get PATH from login shell
+    if let Ok(output) = std::process::Command::new("/bin/zsh")
+        .args(["-l", "-c", "echo $PATH"])
+        .output()
+    {
+        if output.status.success() {
+            let shell_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !shell_path.is_empty() {
+                return shell_path;
+            }
+        }
+    }
+    // Fallback: current PATH + common locations
+    let current = std::env::var("PATH").unwrap_or_default();
+    let home = std::env::var("HOME").unwrap_or_default();
+    format!(
+        "{}/.local/bin:{}/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:{}",
+        home, home, current
+    )
+}
+
+/// Find the claude binary path
+fn find_claude_binary() -> Option<String> {
+    let full_path = resolve_full_path();
+    for dir in full_path.split(':') {
+        let candidate = format!("{}/claude", dir);
+        if std::path::Path::new(&candidate).exists() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
 /// Check if Claude Code CLI is available on PATH
 #[tauri::command]
 fn check_claude_code() -> Result<bool, String> {
-    let output = std::process::Command::new("which")
-        .arg("claude")
-        .output()
-        .map_err(|e| e.to_string())?;
-    Ok(output.status.success())
+    Ok(find_claude_binary().is_some())
 }
 
 /// Get the current project directory
@@ -222,10 +254,17 @@ async fn run_claude_prompt(
         .clone()
         .ok_or("No project directory set")?;
 
+    // Resolve claude binary (macOS GUI apps don't inherit shell PATH)
+    let claude_bin = find_claude_binary()
+        .ok_or("Claude Code not found. Please install it: npm install -g @anthropic-ai/claude-code")?;
+
+    let full_path = resolve_full_path();
+
     // Spawn claude in print mode
-    let mut child = tokio::process::Command::new("claude")
+    let mut child = tokio::process::Command::new(&claude_bin)
         .args(["-p", &prompt])
         .current_dir(&dir)
+        .env("PATH", &full_path)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
