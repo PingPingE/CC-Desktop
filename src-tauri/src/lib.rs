@@ -227,6 +227,124 @@ fn create_project(state: State<AppState>, name: String) -> Result<String, String
 }
 
 /// List files in the project directory
+/// Analyze project: detect language, framework, team status
+#[derive(Clone, Serialize)]
+struct ProjectAnalysis {
+    languages: Vec<String>,
+    framework: Option<String>,
+    has_claude_config: bool,
+    agent_count: usize,
+    skill_count: usize,
+    agents: Vec<String>,
+    skills: Vec<String>,
+    has_git: bool,
+    suggestion: Option<String>,
+}
+
+#[tauri::command]
+fn analyze_project(state: State<AppState>) -> Result<ProjectAnalysis, String> {
+    let dir = state
+        .project_dir
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No project directory set")?;
+
+    let root = Path::new(&dir);
+    let mut languages = Vec::new();
+    let mut framework = None;
+
+    // Detect languages and frameworks by config files
+    if root.join("package.json").exists() {
+        languages.push("JavaScript/TypeScript".to_string());
+        // Try to detect framework from package.json
+        if let Ok(content) = std::fs::read_to_string(root.join("package.json")) {
+            if content.contains("\"next\"") { framework = Some("Next.js".to_string()); }
+            else if content.contains("\"react\"") { framework = Some("React".to_string()); }
+            else if content.contains("\"vue\"") { framework = Some("Vue".to_string()); }
+            else if content.contains("\"svelte\"") { framework = Some("Svelte".to_string()); }
+            else if content.contains("\"express\"") { framework = Some("Express".to_string()); }
+            else if content.contains("\"nuxt\"") { framework = Some("Nuxt".to_string()); }
+            else if content.contains("\"angular\"") { framework = Some("Angular".to_string()); }
+        }
+    }
+    if root.join("Cargo.toml").exists() { languages.push("Rust".to_string()); }
+    if root.join("requirements.txt").exists() || root.join("pyproject.toml").exists() || root.join("setup.py").exists() {
+        languages.push("Python".to_string());
+        if let Ok(content) = std::fs::read_to_string(root.join("requirements.txt").as_path())
+            .or_else(|_| std::fs::read_to_string(root.join("pyproject.toml").as_path()))
+        {
+            if content.contains("django") { framework = Some("Django".to_string()); }
+            else if content.contains("flask") { framework = Some("Flask".to_string()); }
+            else if content.contains("fastapi") { framework = Some("FastAPI".to_string()); }
+        }
+    }
+    if root.join("go.mod").exists() { languages.push("Go".to_string()); }
+    if root.join("pom.xml").exists() || root.join("build.gradle").exists() {
+        languages.push("Java".to_string());
+        if root.join("pom.xml").exists() {
+            if let Ok(c) = std::fs::read_to_string(root.join("pom.xml")) {
+                if c.contains("spring") { framework = Some("Spring".to_string()); }
+            }
+        }
+    }
+    if root.join("Gemfile").exists() { languages.push("Ruby".to_string()); }
+    if root.join("Package.swift").exists() { languages.push("Swift".to_string()); }
+
+    if languages.is_empty() { languages.push("Unknown".to_string()); }
+
+    // Check .claude/ config
+    let claude_dir = root.join(".claude");
+    let has_claude_config = claude_dir.exists();
+    let agents_dir = claude_dir.join("agents");
+    let skills_dir = claude_dir.join("skills");
+
+    let mut agents = Vec::new();
+    let mut skills = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(&agents_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".md") {
+                agents.push(name.trim_end_matches(".md").to_string());
+            }
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(&skills_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".md") {
+                skills.push(name.trim_end_matches(".md").to_string());
+            }
+        }
+    }
+
+    let has_git = root.join(".git").exists();
+
+    // Generate suggestion
+    let suggestion = if !has_claude_config {
+        let fw = framework.as_deref().unwrap_or(&languages[0]);
+        Some(format!("This looks like a {} project. Set up a dev team to get the most out of Claude Code.", fw))
+    } else if agents.is_empty() && skills.is_empty() {
+        Some("Claude Code config found but no agents or skills. Add a team to boost productivity.".to_string())
+    } else {
+        None
+    };
+
+    Ok(ProjectAnalysis {
+        languages,
+        framework,
+        has_claude_config,
+        agent_count: agents.len(),
+        skill_count: skills.len(),
+        agents,
+        skills,
+        has_git,
+        suggestion,
+    })
+}
+
+/// List files in the project directory
 #[tauri::command]
 fn list_project_files(state: State<AppState>) -> Result<Vec<String>, String> {
     let dir = state
@@ -355,6 +473,7 @@ async fn run_claude_prompt(
     app: AppHandle,
     state: State<'_, AppState>,
     prompt: String,
+    auto_approve: Option<bool>,
 ) -> Result<(), String> {
     let dir = state
         .project_dir
@@ -378,9 +497,15 @@ async fn run_claude_prompt(
     env_vars.remove("CLAUDE_CODE_PACKAGE_DIR");
     env_vars.insert("PATH".to_string(), full_path);
 
+    // Build args
+    let mut args = vec!["-p".to_string(), prompt.clone()];
+    if auto_approve.unwrap_or(false) {
+        args.push("--dangerously-skip-permissions".to_string());
+    }
+
     // Spawn claude in print mode with clean environment
     let mut child = tokio::process::Command::new(&claude_bin)
-        .args(["-p", &prompt])
+        .args(&args)
         .current_dir(&dir)
         .env_clear()
         .envs(&env_vars)
@@ -465,6 +590,7 @@ pub fn run() {
             get_project_dir,
             set_project_dir,
             create_project,
+            analyze_project,
             list_project_files,
             discover_skills,
             discover_agents,

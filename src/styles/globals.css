@@ -236,6 +236,93 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-radius: 50%;
 }
 
+/* Auto-approve toggle */
+.auto-approve-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.auto-approve-toggle:hover { border-color: var(--border-hover); }
+.auto-approve-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.auto-approve-on {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #059669;
+}
+.auto-approve-on .auto-approve-dot { background: #10b981; }
+[data-theme="dark"] .auto-approve-on {
+  background: #064e3b;
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+
+/* ============================================
+   PROJECT BAR (below header when project is open)
+   ============================================ */
+.project-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  flex-shrink: 0;
+}
+.project-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.project-bar-tag {
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.project-bar-tag-git {
+  color: var(--info);
+  background: #eff6ff;
+}
+[data-theme="dark"] .project-bar-tag-git {
+  background: #1e3a5f;
+}
+.project-bar-tag-active {
+  color: #059669;
+  background: #ecfdf5;
+}
+[data-theme="dark"] .project-bar-tag-active {
+  color: #6ee7b7;
+  background: #064e3b;
+}
+.project-bar-tag-inactive {
+  color: var(--text-muted);
+}
+.project-bar-suggestion {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 /* ============================================
    FILE SIDEBAR (left panel)

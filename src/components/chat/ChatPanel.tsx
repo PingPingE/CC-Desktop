@@ -8,6 +8,7 @@ import { MessageBubble } from "./MessageBubble";
 interface ChatPanelProps {
   project: Project | null;
   processState: ProcessState;
+  autoApprove: boolean;
   onProcessStateChange: (state: ProcessState) => void;
   onActivityChange: (text: string) => void;
   onOpenProject: () => void;
@@ -19,6 +20,7 @@ interface ChatPanelProps {
 export function ChatPanel({
   project,
   processState,
+  autoApprove,
   onProcessStateChange,
   onActivityChange,
   onOpenProject,
@@ -105,7 +107,7 @@ export function ChatPanel({
       onActivityChange("Claude is thinking...");
 
       try {
-        await invoke("run_claude_prompt", { prompt: content });
+        await invoke("run_claude_prompt", { prompt: content, autoApprove });
       } catch (err) {
         setMessages((prev) =>
           prev.map((m) =>

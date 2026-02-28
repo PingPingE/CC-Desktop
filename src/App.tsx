@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { HeaderBar } from "./components/header/HeaderBar";
+import { ProjectBar } from "./components/project/ProjectBar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ActivityBar } from "./components/activity/ActivityBar";
 import { PermissionDialog } from "./components/permissions/PermissionDialog";
@@ -9,6 +10,18 @@ import type { Project, AppSettings, ProcessState, PermissionRequest } from "./ty
 
 const RECENT_PROJECTS_KEY = "cc-desktop-recent-projects";
 const MAX_RECENT = 5;
+
+export interface ProjectAnalysis {
+  languages: string[];
+  framework: string | null;
+  has_claude_config: boolean;
+  agent_count: number;
+  skill_count: number;
+  agents: string[];
+  skills: string[];
+  has_git: boolean;
+  suggestion: string | null;
+}
 
 function loadRecentProjects(): Project[] {
   try {
@@ -30,6 +43,8 @@ function App() {
   const [activityText, setActivityText] = useState("");
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
   const [recentProjects, setRecentProjects] = useState<Project[]>(loadRecentProjects);
+  const [projectAnalysis, setProjectAnalysis] = useState<ProjectAnalysis | null>(null);
+  const [autoApprove, setAutoApprove] = useState(false);
   const [settings] = useState<AppSettings>({
     theme: "light",
     fontSize: 14,
@@ -50,6 +65,14 @@ function App() {
   const handleProjectSelect = useCallback(async (project: Project) => {
     await invoke("set_project_dir", { path: project.path });
     setCurrentProject(project);
+
+    // Analyze project automatically
+    try {
+      const analysis = await invoke<ProjectAnalysis>("analyze_project");
+      setProjectAnalysis(analysis);
+    } catch {
+      setProjectAnalysis(null);
+    }
 
     setRecentProjects((prev) => {
       const filtered = prev.filter((p) => p.path !== project.path);
@@ -101,15 +124,22 @@ function App() {
       <HeaderBar
         project={currentProject}
         processState={processState}
+        autoApprove={autoApprove}
+        onAutoApproveChange={setAutoApprove}
         onOpenFolder={handleOpenFolder}
         onToggleSettings={() => {}}
       />
+
+      {currentProject && projectAnalysis && (
+        <ProjectBar analysis={projectAnalysis} />
+      )}
 
       <div className="app-body">
         <div className="main-column">
           <ChatPanel
             project={currentProject}
             processState={processState}
+            autoApprove={autoApprove}
             onProcessStateChange={setProcessState}
             onActivityChange={setActivityText}
             onOpenProject={handleOpenFolder}

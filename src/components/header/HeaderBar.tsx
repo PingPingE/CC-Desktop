@@ -3,6 +3,8 @@ import type { Project, ProcessState } from "@/types";
 interface HeaderBarProps {
   project: Project | null;
   processState: ProcessState;
+  autoApprove: boolean;
+  onAutoApproveChange: (value: boolean) => void;
   onOpenFolder: () => void;
   onToggleSettings: () => void;
 }
@@ -10,6 +12,8 @@ interface HeaderBarProps {
 export function HeaderBar({
   project,
   processState,
+  autoApprove,
+  onAutoApproveChange,
   onOpenFolder,
   onToggleSettings,
 }: HeaderBarProps) {
@@ -46,6 +50,21 @@ export function HeaderBar({
           <span className="status-dot" style={{ backgroundColor: color }} />
           <span>{label}</span>
         </div>
+
+        {project && (
+          <button
+            className={`auto-approve-toggle ${autoApprove ? "auto-approve-on" : ""}`}
+            onClick={() => onAutoApproveChange(!autoApprove)}
+            title={autoApprove
+              ? "Auto-approve ON: Claude works freely without asking permission"
+              : "Auto-approve OFF: Claude asks before each action"
+            }
+          >
+            <span className="auto-approve-dot" />
+            <span>{autoApprove ? "Auto" : "Ask"}</span>
+          </button>
+        )}
+
         <button className="header-btn" onClick={onOpenFolder}>
           {project ? "Switch" : "Open"}
         </button>
