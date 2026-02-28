@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 /// Represents a message in the chat
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +152,97 @@ fn discover_agents(state: State<AppState>) -> Result<Vec<String>, String> {
     Ok(agents)
 }
 
+/// Event payloads sent from Rust to frontend
+#[derive(Clone, Serialize)]
+struct ClaudeOutputEvent {
+    line: String,
+}
+
+#[derive(Clone, Serialize)]
+struct ClaudeDoneEvent {
+    success: bool,
+    full_output: String,
+}
+
+#[derive(Clone, Serialize)]
+struct ClaudeErrorEvent {
+    message: String,
+}
+
+/// Run a prompt through Claude Code CLI in print mode.
+/// Spawns `claude -p "prompt"` in the project directory and streams output via events.
+#[tauri::command]
+async fn run_claude_prompt(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    prompt: String,
+) -> Result<(), String> {
+    let dir = state
+        .project_dir
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No project directory set")?;
+
+    // Spawn claude in print mode
+    let mut child = tokio::process::Command::new("claude")
+        .args(["-p", &prompt])
+        .current_dir(&dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start Claude Code: {}. Is it installed?", e))?;
+
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
+
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    let mut full_output = String::new();
+
+    // Read stderr in background
+    let app_clone = app.clone();
+    let stderr_handle = tokio::spawn(async move {
+        let mut stderr_reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = stderr_reader.next_line().await {
+            // Emit stderr as error events (usually progress/status info)
+            let _ = app_clone.emit("claude-error", ClaudeErrorEvent { message: line });
+        }
+    });
+
+    // Stream stdout line by line
+    while let Ok(Some(line)) = stdout_reader.next_line().await {
+        full_output.push_str(&line);
+        full_output.push('\n');
+        app.emit("claude-output", ClaudeOutputEvent { line: line.clone() })
+            .map_err(|e| e.to_string())?;
+    }
+
+    // Wait for process to finish
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+
+    // Wait for stderr reader to finish
+    let _ = stderr_handle.await;
+
+    // Emit done event
+    app.emit(
+        "claude-done",
+        ClaudeDoneEvent {
+            success: status.success(),
+            full_output: full_output.trim().to_string(),
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Stop a running Claude process (for future use with cancellation)
+#[tauri::command]
+async fn stop_claude(_app: AppHandle) -> Result<(), String> {
+    // TODO: Track child PID and kill it
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -167,6 +259,8 @@ pub fn run() {
             list_project_files,
             discover_skills,
             discover_agents,
+            run_claude_prompt,
+            stop_claude,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

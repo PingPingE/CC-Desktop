@@ -287,25 +287,34 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .file-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 5px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
   cursor: default;
   font-size: 13px;
   color: var(--text-secondary);
+  user-select: none;
 }
+.file-item-dir { cursor: pointer; }
 .file-item:hover { background: var(--bg-hover); }
 .file-icon {
   font-size: 10px;
   color: var(--text-muted);
-  width: 14px;
+  width: 16px;
   text-align: center;
+  flex-shrink: 0;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+.file-icon-dir {
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 .file-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.file-item-dir .file-name { font-weight: 500; }
 
 /* Shimmer loading */
 .file-tree-loading { display: flex; flex-direction: column; gap: 6px; padding: 8px; }

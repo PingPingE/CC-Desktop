@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { ChatMessage, ProcessState, Project } from "@/types";
 import { ChatInput } from "./ChatInput";
 import { MessageBubble } from "./MessageBubble";
@@ -18,51 +20,109 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentAssistantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = async (content: string) => {
-    if (!project) return;
+  // Listen for Claude output events
+  useEffect(() => {
+    const unlisten1 = listen<{ line: string }>("claude-output", (event) => {
+      const assistantId = currentAssistantIdRef.current;
+      if (!assistantId) return;
 
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content,
-      timestamp: Date.now(),
-      status: "complete",
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    onProcessStateChange("running");
-    onActivityChange("Claude is thinking...");
-
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      timestamp: Date.now(),
-      status: "streaming",
-    };
-    setMessages((prev) => [...prev, assistantMessage]);
-
-    // TODO: Connect to Claude Code CLI via Tauri shell plugin
-    setTimeout(() => {
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantMessage.id
+          m.id === assistantId
             ? {
                 ...m,
-                content: "Claude Code integration coming soon. This is where the response will stream in real-time.",
-                status: "complete" as const,
+                content: m.content ? m.content + "\n" + event.payload.line : event.payload.line,
+              }
+            : m
+        )
+      );
+      onActivityChange("Claude is responding...");
+    });
+
+    const unlisten2 = listen<{ success: boolean; full_output: string }>("claude-done", (event) => {
+      const assistantId = currentAssistantIdRef.current;
+      if (!assistantId) return;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? {
+                ...m,
+                content: event.payload.full_output || m.content || "(No response)",
+                status: event.payload.success ? ("complete" as const) : ("error" as const),
               }
             : m
         )
       );
       onProcessStateChange("idle");
       onActivityChange("");
-    }, 1500);
-  };
+      currentAssistantIdRef.current = null;
+    });
+
+    const unlisten3 = listen<{ message: string }>("claude-error", () => {
+      // stderr from claude — usually progress info, not fatal errors
+    });
+
+    return () => {
+      unlisten1.then((fn) => fn());
+      unlisten2.then((fn) => fn());
+      unlisten3.then((fn) => fn());
+    };
+  }, [onProcessStateChange, onActivityChange]);
+
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      if (!project) return;
+
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content,
+        timestamp: Date.now(),
+        status: "complete",
+      };
+
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        status: "streaming",
+      };
+
+      currentAssistantIdRef.current = assistantMessage.id;
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      onProcessStateChange("running");
+      onActivityChange("Claude is thinking...");
+
+      try {
+        await invoke("run_claude_prompt", { prompt: content });
+      } catch (err) {
+        // invoke itself errored (e.g., claude not found)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMessage.id
+              ? {
+                  ...m,
+                  content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+                  status: "error" as const,
+                }
+              : m
+          )
+        );
+        onProcessStateChange("error");
+        onActivityChange("Something went wrong");
+        currentAssistantIdRef.current = null;
+      }
+    },
+    [project, onProcessStateChange, onActivityChange]
+  );
 
   return (
     <div className="chat-panel">
