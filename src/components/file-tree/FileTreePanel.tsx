@@ -24,9 +24,14 @@ export function FileTreePanel({ projectPath }: FileTreePanelProps) {
       </div>
       <div className="file-tree">
         {loading ? (
-          <p className="text-muted">Loading...</p>
+          <div className="file-tree-loading">
+            <div className="shimmer" />
+            <div className="shimmer" />
+            <div className="shimmer" />
+            <div className="shimmer" />
+          </div>
         ) : files.length === 0 ? (
-          <p className="text-muted">No files found</p>
+          <p className="text-muted" style={{ padding: "8px" }}>No files found</p>
         ) : (
           <ul className="file-list">
             {files.map((file) => (

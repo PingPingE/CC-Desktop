@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { ChatPanel } from "./components/chat/ChatPanel";
@@ -24,38 +24,32 @@ function App() {
     recentProjects: [],
   });
 
-  // Check if Claude Code is installed on launch
-  useEffect(() => {
+  const checkClaude = useCallback(() => {
     invoke<boolean>("check_claude_code")
       .then(setClaudeInstalled)
       .catch(() => setClaudeInstalled(false));
   }, []);
 
-  // Show loading screen
+  useEffect(() => { checkClaude(); }, [checkClaude]);
+
+  // Loading
   if (claudeInstalled === null) {
     return (
       <div className="app-loading">
+        <div className="loading-spinner" />
         <p>Starting CC Desktop...</p>
       </div>
     );
   }
 
-  // Show onboarding if Claude Code not found
+  // Onboarding
   if (claudeInstalled === false) {
-    return (
-      <OnboardingScreen
-        onRetry={() => {
-          invoke<boolean>("check_claude_code")
-            .then(setClaudeInstalled)
-            .catch(() => setClaudeInstalled(false));
-        }}
-      />
-    );
+    return <OnboardingScreen onRetry={checkClaude} />;
   }
 
   return (
     <div className="app-container" data-theme={settings.theme}>
-      {/* Left sidebar: project, team, templates, settings */}
+      {/* Left sidebar */}
       <Sidebar
         currentProject={currentProject}
         onProjectSelect={setCurrentProject}
@@ -63,24 +57,27 @@ function App() {
         onSettingsChange={setSettings}
       />
 
-      {/* File tree panel (toggleable) */}
+      {/* File tree (toggleable) */}
       {showFileTree && currentProject && (
         <FileTreePanel projectPath={currentProject.path} />
       )}
 
-      {/* Main chat area */}
-      <ChatPanel
-        project={currentProject}
-        processState={processState}
-        onProcessStateChange={setProcessState}
-        onToggleFileTree={() => setShowFileTree(!showFileTree)}
-        onToggleTerminal={() => setShowTerminal(!showTerminal)}
-      />
+      {/* Main column: chat + terminal */}
+      <div className="main-column">
+        <ChatPanel
+          project={currentProject}
+          processState={processState}
+          onProcessStateChange={setProcessState}
+          onToggleFileTree={() => setShowFileTree(!showFileTree)}
+          onToggleTerminal={() => setShowTerminal(!showTerminal)}
+          showFileTree={showFileTree}
+          showTerminal={showTerminal}
+        />
 
-      {/* Bottom terminal panel (toggleable) */}
-      {showTerminal && <TerminalPanel />}
+        {showTerminal && <TerminalPanel />}
+      </div>
 
-      {/* Permission dialog (modal) — only shown when not auto-approved */}
+      {/* Permission dialog (modal) */}
       {permissionRequest && (
         <PermissionDialog
           request={permissionRequest}

@@ -9,6 +9,8 @@ interface ChatPanelProps {
   onProcessStateChange: (state: ProcessState) => void;
   onToggleFileTree: () => void;
   onToggleTerminal: () => void;
+  showFileTree: boolean;
+  showTerminal: boolean;
 }
 
 export function ChatPanel({
@@ -17,6 +19,8 @@ export function ChatPanel({
   onProcessStateChange,
   onToggleFileTree,
   onToggleTerminal,
+  showFileTree,
+  showTerminal,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -28,7 +32,6 @@ export function ChatPanel({
   const handleSendMessage = async (content: string) => {
     if (!project) return;
 
-    // Add user message
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -37,11 +40,8 @@ export function ChatPanel({
       status: "complete",
     };
     setMessages((prev) => [...prev, userMessage]);
-
-    // Start Claude Code process
     onProcessStateChange("running");
 
-    // Add streaming assistant message placeholder
     const assistantMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "assistant",
@@ -52,33 +52,39 @@ export function ChatPanel({
     setMessages((prev) => [...prev, assistantMessage]);
 
     // TODO: Connect to Claude Code CLI via Tauri shell plugin
-    // For now, simulate a response
     setTimeout(() => {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMessage.id
             ? {
                 ...m,
-                content:
-                  "Claude Code integration coming soon. This is where the response will stream in real-time.",
-                status: "complete",
+                content: "Claude Code integration coming soon. This is where the response will stream in real-time.",
+                status: "complete" as const,
               }
             : m
         )
       );
       onProcessStateChange("idle");
-    }, 1000);
+    }, 1500);
   };
 
   return (
-    <main className="chat-panel">
+    <div className="chat-panel">
       {/* Toolbar */}
       <div className="chat-toolbar">
         <div className="toolbar-left">
-          <button className="toolbar-btn" onClick={onToggleFileTree} title="Toggle File Tree">
+          <button
+            className={`toolbar-btn ${showFileTree ? "active" : ""}`}
+            onClick={onToggleFileTree}
+            title="Toggle File Tree"
+          >
             Files
           </button>
-          <button className="toolbar-btn" onClick={onToggleTerminal} title="Toggle Terminal">
+          <button
+            className={`toolbar-btn ${showTerminal ? "active" : ""}`}
+            onClick={onToggleTerminal}
+            title="Toggle Terminal"
+          >
             Terminal
           </button>
         </div>
@@ -110,60 +116,51 @@ export function ChatPanel({
         disabled={!project || processState === "running"}
         processState={processState}
       />
-    </main>
+    </div>
   );
 }
 
 function WelcomeScreen({ hasProject }: { hasProject: boolean }) {
   return (
     <div className="welcome-screen">
-      <h2>CC Desktop</h2>
-      <p>Your Claude Code development environment</p>
+      <div className="welcome-icon">CC</div>
       {!hasProject ? (
-        <div className="welcome-actions">
-          <p>Open a project folder to get started</p>
-        </div>
+        <>
+          <h2>Welcome to CC Desktop</h2>
+          <p>Open a project folder from the sidebar to get started.</p>
+        </>
       ) : (
-        <div className="welcome-actions">
-          <p>Try these commands:</p>
+        <>
+          <h2>What do you want to build?</h2>
+          <p>Type a message below, or try a slash command:</p>
           <div className="command-suggestions">
             <code>/plan-feature</code>
             <code>/implement</code>
             <code>/code-review</code>
             <code>/refactor</code>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 }
 
 function ProcessIndicator({ state }: { state: ProcessState }) {
-  const labels: Record<ProcessState, string> = {
-    idle: "Ready",
-    starting: "Starting...",
-    running: "Running...",
-    waiting_permission: "Waiting for approval",
-    error: "Error",
-    stopped: "Stopped",
+  const config: Record<ProcessState, { label: string; color: string }> = {
+    idle: { label: "Ready", color: "var(--success)" },
+    starting: { label: "Starting...", color: "var(--warning)" },
+    running: { label: "Running...", color: "var(--accent)" },
+    waiting_permission: { label: "Waiting", color: "var(--warning)" },
+    error: { label: "Error", color: "var(--error)" },
+    stopped: { label: "Stopped", color: "var(--text-muted)" },
   };
 
-  const colors: Record<ProcessState, string> = {
-    idle: "var(--success)",
-    starting: "var(--warning)",
-    running: "var(--accent)",
-    waiting_permission: "var(--warning)",
-    error: "var(--error)",
-    stopped: "var(--text-muted)",
-  };
+  const { label, color } = config[state];
 
   return (
     <div className="process-indicator">
-      <span
-        className="status-dot"
-        style={{ backgroundColor: colors[state] }}
-      />
-      <span className="status-label">{labels[state]}</span>
+      <span className="status-dot" style={{ backgroundColor: color }} />
+      <span className="status-label">{label}</span>
     </div>
   );
 }

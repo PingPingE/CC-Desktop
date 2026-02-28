@@ -95,14 +95,14 @@ function ProjectList({
       </button>
       {current && (
         <div className="current-project">
-          <span className="label">Current</span>
+          <span className="section-label">Current</span>
           <span className="project-name">{current.name}</span>
           <span className="project-path">{current.path}</span>
         </div>
       )}
       {recent.length > 0 && (
         <>
-          <span className="label">Recent</span>
+          <span className="section-label">Recent</span>
           {recent.map((p) => (
             <button
               key={p.path}
@@ -128,7 +128,7 @@ function TemplateList() {
 
   return (
     <div className="panel-section">
-      <h3>CC-Marketplace Templates</h3>
+      <h3 className="panel-title">CC-Marketplace Templates</h3>
       <p className="text-muted">
         Templates are optional — CC Desktop works with any Claude Code project.
       </p>
