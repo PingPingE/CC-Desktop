@@ -5,12 +5,15 @@ interface ChatInputProps {
   onSend: (content: string) => void;
   disabled: boolean;
   processState: ProcessState;
+  onStop: () => void;
+  onClear?: () => void;
 }
 
-export function ChatInput({ onSend, disabled, processState }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, processState, onStop, onClear }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isRunning = processState === "running";
 
   // Auto-resize textarea
   useEffect(() => {
@@ -90,7 +93,7 @@ export function ChatInput({ onSend, disabled, processState }: ChatInputProps) {
           onKeyDown={handleKeyDown}
           placeholder={
             disabled
-              ? processState === "running"
+              ? isRunning
                 ? "Claude is working..."
                 : "Open a project to start"
               : 'Type a message or "/" for commands...'
@@ -98,17 +101,35 @@ export function ChatInput({ onSend, disabled, processState }: ChatInputProps) {
           disabled={disabled}
           rows={1}
         />
-        <button
-          className="send-btn"
-          onClick={handleSubmit}
-          disabled={!input.trim() || disabled}
-        >
-          Send
-        </button>
+        {isRunning ? (
+          <button className="stop-btn" onClick={onStop}>
+            Stop
+          </button>
+        ) : (
+          <button
+            className="send-btn"
+            onClick={handleSubmit}
+            disabled={!input.trim() || disabled}
+          >
+            Send
+          </button>
+        )}
       </div>
 
       <div className="chat-input-hint">
-        <span>Enter to send, Shift+Enter for new line, / for commands</span>
+        {isRunning ? (
+          <span>Claude is working... press Stop to interrupt</span>
+        ) : (
+          <span>
+            Enter to send, Shift+Enter for new line, / for commands
+            {onClear && (
+              <>
+                {" · "}
+                <button className="clear-chat-btn" onClick={onClear}>Clear chat</button>
+              </>
+            )}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -56,30 +56,6 @@ export interface Agent {
   filePath: string;
 }
 
-/** File tree node */
-export interface FileNode {
-  name: string;
-  path: string;
-  type: "file" | "directory";
-  children?: FileNode[];
-  modified?: boolean;
-}
-
-/** Auto-approve mode for permissions */
-export type ApproveMode =
-  | "ask-every-time"     // Default: approve each action individually
-  | "auto-approve-safe"  // File reads/searches auto, edits/commands ask
-  | "auto-approve-all";  // Everything runs without asking (skip-permissions)
-
-/** App-wide settings */
-export interface AppSettings {
-  theme: "light" | "dark" | "system";
-  fontSize: number;
-  approveMode: ApproveMode;
-  showFileTree: boolean;
-  showAgentPanel: boolean;
-  recentProjects: Project[];
-}
 
 /** Claude Code process state */
 export type ProcessState =
@@ -99,26 +75,23 @@ export interface PermissionRequest {
   filePath?: string;
 }
 
-/** Git status for current project */
-export interface GitStatus {
-  branch: string;
-  modified: string[];
-  staged: string[];
-  untracked: string[];
-  ahead: number;
-  behind: number;
+
+/** Claude Code installation status (from Rust backend) */
+export interface ClaudeInstallStatus {
+  installed: boolean;
+  version: string | null;
+  path: string | null;
 }
 
-/** Template info from CC-Marketplace */
-export interface TemplateInfo {
-  slug: string;
-  name: string;
-  description: string;
-  price: number;
-  agents: number;
-  skills: number;
-  checkoutUrl: string;
-  installed: boolean;
+/** Claude Code auth status */
+export interface ClaudeAuthStatus {
+  authenticated: boolean;
+}
+
+/** Install progress event from backend */
+export interface InstallProgressEvent {
+  line: string;
+  stage: "downloading" | "installing" | "done";
 }
 
 /** Remote session connection */

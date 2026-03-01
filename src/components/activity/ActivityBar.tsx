@@ -3,9 +3,10 @@ import type { ProcessState } from "@/types";
 interface ActivityBarProps {
   processState: ProcessState;
   text: string;
+  onStop?: () => void;
 }
 
-export function ActivityBar({ processState, text }: ActivityBarProps) {
+export function ActivityBar({ processState, text, onStop }: ActivityBarProps) {
   const isWorking = processState === "running" || processState === "starting";
 
   return (
@@ -16,8 +17,15 @@ export function ActivityBar({ processState, text }: ActivityBarProps) {
           ? text || "Claude is working..."
           : processState === "error"
             ? "Something went wrong. Try again."
-            : "Ready"}
+            : processState === "stopped"
+              ? "Stopped."
+              : "Ready"}
       </span>
+      {isWorking && onStop && (
+        <button className="activity-stop-btn" onClick={onStop}>
+          Stop
+        </button>
+      )}
     </div>
   );
 }

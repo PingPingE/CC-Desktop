@@ -11,6 +11,16 @@ export default defineConfig(async () => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "syntax-highlighter": ["react-syntax-highlighter"],
+          "react-markdown": ["react-markdown", "remark-gfm"],
+        },
+      },
+    },
+  },
   clearScreen: false,
   server: {
     port: 1420,

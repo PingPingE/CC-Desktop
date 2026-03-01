@@ -5,8 +5,9 @@ import { ProjectBar } from "./components/project/ProjectBar";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ActivityBar } from "./components/activity/ActivityBar";
 import { PermissionDialog } from "./components/permissions/PermissionDialog";
-import { OnboardingScreen } from "./components/settings/OnboardingScreen";
-import type { Project, AppSettings, ProcessState, PermissionRequest } from "./types";
+import { SettingsPanel } from "./components/settings/SettingsPanel";
+import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
+import type { Project, ProcessState, PermissionRequest } from "./types";
 
 const RECENT_PROJECTS_KEY = "cc-desktop-recent-projects";
 const MAX_RECENT = 5;
@@ -37,7 +38,10 @@ function saveRecentProjects(projects: Project[]) {
 }
 
 function App() {
-  const [claudeInstalled, setClaudeInstalled] = useState<boolean | null>(null);
+  const [onboardingDone, setOnboardingDone] = useState(
+    localStorage.getItem("onboarding_completed") === "true"
+  );
+  const [appReady, setAppReady] = useState(false);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [processState, setProcessState] = useState<ProcessState>("idle");
   const [activityText, setActivityText] = useState("");
@@ -45,22 +49,26 @@ function App() {
   const [recentProjects, setRecentProjects] = useState<Project[]>(loadRecentProjects);
   const [projectAnalysis, setProjectAnalysis] = useState<ProjectAnalysis | null>(null);
   const [autoApprove, setAutoApprove] = useState(false);
-  const [settings] = useState<AppSettings>({
-    theme: "light",
-    fontSize: 14,
-    approveMode: "ask-every-time",
-    showFileTree: true,
-    showAgentPanel: true,
-    recentProjects: [],
+  const [showSettings, setShowSettings] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      return (localStorage.getItem("cc-desktop-theme") as "light" | "dark") || "light";
+    } catch {
+      return "light";
+    }
   });
 
-  const checkClaude = useCallback(() => {
-    invoke<boolean>("check_claude_code")
-      .then(setClaudeInstalled)
-      .catch(() => setClaudeInstalled(false));
+  const handleThemeChange = useCallback((newTheme: "light" | "dark") => {
+    setTheme(newTheme);
+    localStorage.setItem("cc-desktop-theme", newTheme);
   }, []);
 
-  useEffect(() => { checkClaude(); }, [checkClaude]);
+  // Quick check on startup — just verify app can start
+  useEffect(() => {
+    // Small delay to allow Tauri bridge to initialize
+    const timer = setTimeout(() => setAppReady(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleProjectSelect = useCallback(async (project: Project) => {
     await invoke("set_project_dir", { path: project.path });
@@ -106,28 +114,53 @@ function App() {
     });
   }, [handleProjectSelect]);
 
-  if (claudeInstalled === null) {
+  const handleStop = useCallback(async () => {
+    try {
+      await invoke("stop_claude");
+      setProcessState("stopped");
+    } catch {
+      // No running process — ignore
+    }
+  }, []);
+
+  const handleOnboardingComplete = useCallback((projectPath: string, projectName: string) => {
+    setOnboardingDone(true);
+    handleProjectSelect({
+      path: projectPath,
+      name: projectName,
+      lastOpened: Date.now(),
+      hasClaudeConfig: false,
+    });
+  }, [handleProjectSelect]);
+
+  // Loading state
+  if (!appReady) {
     return (
-      <div className="app-loading">
+      <div className="app-loading" data-theme={theme}>
         <div className="loading-spinner" />
         <p>Starting CC Desktop...</p>
       </div>
     );
   }
 
-  if (claudeInstalled === false) {
-    return <OnboardingScreen onRetry={checkClaude} />;
+  // Onboarding wizard for first-time users
+  if (!onboardingDone) {
+    return (
+      <div data-theme={theme}>
+        <OnboardingWizard onComplete={handleOnboardingComplete} />
+      </div>
+    );
   }
 
   return (
-    <div className="app-container" data-theme={settings.theme}>
+    <div className="app-container" data-theme={theme}>
       <HeaderBar
         project={currentProject}
         processState={processState}
         autoApprove={autoApprove}
         onAutoApproveChange={setAutoApprove}
         onOpenFolder={handleOpenFolder}
-        onToggleSettings={() => {}}
+        onToggleSettings={() => setShowSettings((v) => !v)}
       />
 
       {currentProject && projectAnalysis && (
@@ -146,17 +179,26 @@ function App() {
             onCreateProject={handleCreateProject}
             recentProjects={recentProjects}
             onSelectRecentProject={handleProjectSelect}
+            onStop={handleStop}
           />
         </div>
       </div>
 
-      <ActivityBar processState={processState} text={activityText} />
+      <ActivityBar processState={processState} text={activityText} onStop={handleStop} />
 
       {permissionRequest && (
         <PermissionDialog
           request={permissionRequest}
           onApprove={() => setPermissionRequest(null)}
           onDeny={() => setPermissionRequest(null)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsPanel
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>

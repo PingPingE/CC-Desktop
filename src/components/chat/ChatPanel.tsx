@@ -15,6 +15,7 @@ interface ChatPanelProps {
   onCreateProject: (name: string) => void;
   recentProjects: Project[];
   onSelectRecentProject: (project: Project) => void;
+  onStop: () => void;
 }
 
 export function ChatPanel({
@@ -27,14 +28,66 @@ export function ChatPanel({
   onCreateProject,
   recentProjects,
   onSelectRecentProject,
+  onStop,
 }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (!project) return [];
+    try {
+      const key = `cc-chat-${project.path}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved) as ChatMessage[];
+        // Only restore completed messages (not streaming)
+        return parsed
+          .filter((m) => m.status === "complete" || m.status === "error")
+          .slice(-50); // Keep last 50 messages
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Persist completed messages to localStorage
+  useEffect(() => {
+    if (!project) return;
+    const completed = messages.filter((m) => m.status === "complete" || m.status === "error");
+    if (completed.length === 0) {
+      localStorage.removeItem(`cc-chat-${project.path}`);
+      return;
+    }
+    // Keep last 50 messages to prevent storage bloat
+    const toSave = completed.slice(-50);
+    localStorage.setItem(`cc-chat-${project.path}`, JSON.stringify(toSave));
+  }, [messages, project]);
+
+  // Reset messages when project changes
+  useEffect(() => {
+    if (!project) {
+      setMessages([]);
+      return;
+    }
+    try {
+      const key = `cc-chat-${project.path}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved) as ChatMessage[];
+        setMessages(
+          parsed
+            .filter((m) => m.status === "complete" || m.status === "error")
+            .slice(-50)
+        );
+      } else {
+        setMessages([]);
+      }
+    } catch {
+      setMessages([]);
+    }
+  }, [project?.path]);
 
   // Listen for Claude output events
   useEffect(() => {
@@ -114,7 +167,7 @@ export function ChatPanel({
             m.id === assistantMessage.id
               ? {
                   ...m,
-                  content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+                  content: `${err instanceof Error ? err.message : String(err)}`,
                   status: "error" as const,
                 }
               : m
@@ -125,8 +178,25 @@ export function ChatPanel({
         currentAssistantIdRef.current = null;
       }
     },
-    [project, onProcessStateChange, onActivityChange]
+    [project, autoApprove, onProcessStateChange, onActivityChange]
   );
+
+  const handleRetry = useCallback(
+    (_content: string) => {
+      // Find the user message that triggered this error, and resend
+      const userMessages = messages.filter((m) => m.role === "user");
+      const lastUserMessage = userMessages[userMessages.length - 1];
+      if (lastUserMessage) {
+        handleSendMessage(lastUserMessage.content);
+      }
+    },
+    [messages, handleSendMessage]
+  );
+
+  const handleClearChat = useCallback(() => {
+    setMessages([]);
+    currentAssistantIdRef.current = null;
+  }, []);
 
   return (
     <div className="chat-panel">
@@ -140,7 +210,13 @@ export function ChatPanel({
             onSelectRecentProject={onSelectRecentProject}
           />
         ) : (
-          messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+          messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              onRetry={msg.status === "error" ? handleRetry : undefined}
+            />
+          ))
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -149,6 +225,8 @@ export function ChatPanel({
         onSend={handleSendMessage}
         disabled={!project || processState === "running"}
         processState={processState}
+        onStop={onStop}
+        onClear={messages.length > 0 ? handleClearChat : undefined}
       />
     </div>
   );

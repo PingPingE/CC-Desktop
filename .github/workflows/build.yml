@@ -1,0 +1,121 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            artifact_suffix: mac-arm64
+          - platform: macos-13
+            target: x86_64-apple-darwin
+            artifact_suffix: mac-x64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_suffix: windows-x64
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact_suffix: linux-x64
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Linux: install system dependencies for Tauri
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code signing placeholders — uncomment when certificates are available
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'CC Desktop ${{ github.ref_name }}'
+          releaseBody: |
+            ## CC Desktop ${{ github.ref_name }}
+
+            Claude Code를 터미널 없이 사용할 수 있는 데스크톱 앱입니다.
+
+            ### Download
+
+            | Platform | File |
+            |----------|------|
+            | macOS (Apple Silicon) | `.dmg` (arm64) |
+            | macOS (Intel) | `.dmg` (x64) |
+            | Windows | `.exe` (NSIS installer) |
+            | Linux | `.AppImage` / `.deb` |
+
+            ### First-time install notes
+
+            **macOS**: "확인되지 않은 개발자" 경고가 나타나면 → 파일을 우클릭 → "열기" → "열기" 클릭 (한 번만 하면 됩니다)
+
+            **Windows**: "Windows가 PC를 보호했습니다" 경고가 나타나면 → "추가 정보" → "실행" 클릭
+
+            ### What's new
+
+            See [CHANGELOG](https://github.com/PingPingE/CC-Desktop/blob/main/CHANGELOG.md) for details.
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}
+
+  # Keep a 'latest' tag pointing to the most recent release
+  update-latest:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update latest tag
+        run: |
+          git tag -f latest
+          git push origin latest --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

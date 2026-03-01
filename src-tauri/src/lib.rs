@@ -4,6 +4,9 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
+#[cfg(not(target_os = "windows"))]
+extern crate libc;
+
 /// Represents a message in the chat
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -16,6 +19,7 @@ pub struct ChatMessage {
 /// Project state managed by the app
 pub struct AppState {
     pub project_dir: Mutex<Option<String>>,
+    pub child_pid: Mutex<Option<u32>>,
 }
 
 // =============================================================================
@@ -452,6 +456,195 @@ fn discover_agents(state: State<AppState>) -> Result<Vec<String>, String> {
 }
 
 // =============================================================================
+// Claude Code detection, installation, and auth
+// =============================================================================
+
+/// Status of Claude Code CLI installation
+#[derive(Clone, Serialize)]
+struct ClaudeInstallStatus {
+    installed: bool,
+    version: Option<String>,
+    path: Option<String>,
+}
+
+/// Check Claude Code installation status with version info
+#[tauri::command]
+async fn check_claude_installed() -> Result<ClaudeInstallStatus, String> {
+    let bin_path = find_claude_binary();
+
+    match bin_path {
+        Some(path) => {
+            // Try to get version
+            let full_path = resolve_full_path();
+            let version = tokio::process::Command::new(&path)
+                .arg("--version")
+                .env("PATH", &full_path)
+                .output()
+                .await
+                .ok()
+                .and_then(|output| {
+                    if output.status.success() {
+                        let v = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        if v.is_empty() { None } else { Some(v) }
+                    } else {
+                        None
+                    }
+                });
+
+            Ok(ClaudeInstallStatus {
+                installed: true,
+                version,
+                path: Some(path),
+            })
+        }
+        None => Ok(ClaudeInstallStatus {
+            installed: false,
+            version: None,
+            path: None,
+        }),
+    }
+}
+
+/// Install event for streaming progress to frontend
+#[derive(Clone, Serialize)]
+struct InstallProgressEvent {
+    line: String,
+    stage: String,
+}
+
+/// Install Claude Code using the official native installer
+#[tauri::command]
+async fn install_claude_code(app: AppHandle) -> Result<(), String> {
+    app.emit(
+        "install-progress",
+        InstallProgressEvent {
+            line: "Starting Claude Code installation...".to_string(),
+            stage: "downloading".to_string(),
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    #[cfg(not(target_os = "windows"))]
+    let mut child = {
+        tokio::process::Command::new("sh")
+            .args(["-c", "curl -fsSL https://claude.ai/install.sh | sh"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start installer: {}", e))?
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut child = {
+        tokio::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "irm https://claude.ai/install.ps1 | iex",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start installer: {}", e))?
+    };
+
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
+
+    let app_clone = app.clone();
+    let stderr_handle = tokio::spawn(async move {
+        let mut stderr_reader = BufReader::new(stderr).lines();
+        let mut stderr_output = String::new();
+        while let Ok(Some(line)) = stderr_reader.next_line().await {
+            let _ = app_clone.emit(
+                "install-progress",
+                InstallProgressEvent {
+                    line: line.clone(),
+                    stage: "installing".to_string(),
+                },
+            );
+            stderr_output.push_str(&line);
+            stderr_output.push('\n');
+        }
+        stderr_output
+    });
+
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    while let Ok(Some(line)) = stdout_reader.next_line().await {
+        let _ = app.emit(
+            "install-progress",
+            InstallProgressEvent {
+                line: line.clone(),
+                stage: "installing".to_string(),
+            },
+        );
+    }
+
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+    let stderr_output = stderr_handle.await.unwrap_or_default();
+
+    if !status.success() {
+        let err_msg = if stderr_output.trim().is_empty() {
+            "Installation failed. Please try manual installation.".to_string()
+        } else {
+            stderr_output.trim().to_string()
+        };
+        return Err(err_msg);
+    }
+
+    // Verify installation
+    let check = check_claude_installed().await?;
+    if !check.installed {
+        return Err(
+            "Installation completed but Claude Code was not found. You may need to restart the app."
+                .to_string(),
+        );
+    }
+
+    app.emit(
+        "install-progress",
+        InstallProgressEvent {
+            line: format!(
+                "Claude Code installed successfully! ({})",
+                check.version.unwrap_or_else(|| "unknown version".to_string())
+            ),
+            stage: "done".to_string(),
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Auth status for Claude Code
+#[derive(Clone, Serialize)]
+struct ClaudeAuthStatus {
+    authenticated: bool,
+}
+
+/// Check if Claude Code is authenticated
+#[tauri::command]
+async fn check_claude_auth() -> Result<ClaudeAuthStatus, String> {
+    let bin_path = find_claude_binary().ok_or("Claude Code is not installed")?;
+    let full_path = resolve_full_path();
+
+    // Run "claude --version" — if it returns successfully, the binary works.
+    // Auth is checked on first actual prompt; we just verify the binary runs.
+    let output = tokio::process::Command::new(&bin_path)
+        .arg("--version")
+        .env("PATH", &full_path)
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run Claude Code: {}", e))?;
+
+    Ok(ClaudeAuthStatus {
+        authenticated: output.status.success(),
+    })
+}
+
+// =============================================================================
 // Claude Code CLI integration
 // =============================================================================
 
@@ -484,7 +677,7 @@ async fn run_claude_prompt(
 
     // Resolve claude binary (GUI apps may not inherit shell PATH)
     let claude_bin = find_claude_binary()
-        .ok_or("Claude Code not found. Please install it: npm install -g @anthropic-ai/claude-code")?;
+        .ok_or("Claude Code를 찾을 수 없습니다. 설정에서 다시 설치해주세요.")?;
 
     let full_path = resolve_full_path();
 
@@ -514,6 +707,11 @@ async fn run_claude_prompt(
         .spawn()
         .map_err(|e| format!("Failed to start Claude Code: {}", e))?;
 
+    // Track child PID for stop_claude
+    if let Some(pid) = child.id() {
+        *state.child_pid.lock().unwrap() = Some(pid);
+    }
+
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
 
@@ -542,6 +740,9 @@ async fn run_claude_prompt(
     let status = child.wait().await.map_err(|e| e.to_string())?;
     let stderr_output = stderr_handle.await.unwrap_or_default();
 
+    // Clear PID tracking
+    *state.child_pid.lock().unwrap() = None;
+
     // If claude failed and stdout is empty, use stderr as error message
     let final_output = if !status.success() && full_output.trim().is_empty() {
         let err_msg = stderr_output.trim();
@@ -568,9 +769,35 @@ async fn run_claude_prompt(
 
 /// Stop a running Claude process
 #[tauri::command]
-async fn stop_claude(_app: AppHandle) -> Result<(), String> {
-    // TODO: Track child PID and kill it
-    Ok(())
+async fn stop_claude(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let pid = state.child_pid.lock().unwrap().take();
+    if let Some(pid) = pid {
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Send SIGTERM to the process group
+            unsafe {
+                libc::kill(-(pid as i32), libc::SIGTERM);
+            }
+        }
+        #[cfg(target_os = "windows")]
+        {
+            // On Windows, use taskkill to kill the process tree
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output();
+        }
+        app.emit(
+            "claude-done",
+            ClaudeDoneEvent {
+                success: false,
+                full_output: "Stopped by user.".to_string(),
+            },
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    } else {
+        Err("No running process to stop".to_string())
+    }
 }
 
 // =============================================================================
@@ -584,9 +811,13 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             project_dir: Mutex::new(None),
+            child_pid: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             check_claude_code,
+            check_claude_installed,
+            install_claude_code,
+            check_claude_auth,
             get_project_dir,
             set_project_dir,
             create_project,
