@@ -405,9 +405,51 @@ fn collect_files(
     Ok(())
 }
 
-/// Discover skills from .claude/skills/
+/// Agent metadata parsed from YAML frontmatter
+#[derive(Clone, Serialize)]
+struct AgentInfo {
+    slug: String,
+    name: String,
+    description: String,
+    model: String,
+}
+
+/// Skill metadata parsed from .md file
+#[derive(Clone, Serialize)]
+struct SkillInfo {
+    slug: String,
+    name: String,
+    description: String,
+}
+
+/// Parse YAML frontmatter from a markdown file.
+/// Returns a HashMap of key-value pairs from the --- delimited section.
+fn parse_frontmatter(content: &str) -> std::collections::HashMap<String, String> {
+    let mut map = std::collections::HashMap::new();
+    let trimmed = content.trim();
+    if !trimmed.starts_with("---") {
+        return map;
+    }
+    // Find the closing ---
+    if let Some(end) = trimmed[3..].find("---") {
+        let yaml_section = &trimmed[3..3 + end];
+        for line in yaml_section.lines() {
+            let line = line.trim();
+            if let Some(colon_pos) = line.find(':') {
+                let key = line[..colon_pos].trim().to_string();
+                let value = line[colon_pos + 1..].trim().trim_matches('"').to_string();
+                if !key.is_empty() && !value.is_empty() {
+                    map.insert(key, value);
+                }
+            }
+        }
+    }
+    map
+}
+
+/// Discover skills from .claude/skills/ with metadata
 #[tauri::command]
-fn discover_skills(state: State<AppState>) -> Result<Vec<String>, String> {
+fn discover_skills(state: State<AppState>) -> Result<Vec<SkillInfo>, String> {
     let dir = state
         .project_dir
         .lock()
@@ -420,19 +462,40 @@ fn discover_skills(state: State<AppState>) -> Result<Vec<String>, String> {
 
     if let Ok(entries) = std::fs::read_dir(&skills_dir) {
         for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".md") {
-                skills.push(name.trim_end_matches(".md").to_string());
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !file_name.ends_with(".md") {
+                continue;
             }
+            let slug = file_name.trim_end_matches(".md").to_string();
+            let content = std::fs::read_to_string(entry.path()).unwrap_or_default();
+            let fm = parse_frontmatter(&content);
+
+            // Get first non-frontmatter line as description fallback
+            let body_desc = content
+                .split("---")
+                .nth(2)
+                .unwrap_or("")
+                .lines()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+
+            skills.push(SkillInfo {
+                name: fm.get("name").cloned().unwrap_or_else(|| slug.clone()),
+                description: fm.get("description").cloned().unwrap_or(body_desc),
+                slug,
+            });
         }
     }
 
+    skills.sort_by(|a, b| a.slug.cmp(&b.slug));
     Ok(skills)
 }
 
-/// Discover agents from .claude/agents/
+/// Discover agents from .claude/agents/ with metadata
 #[tauri::command]
-fn discover_agents(state: State<AppState>) -> Result<Vec<String>, String> {
+fn discover_agents(state: State<AppState>) -> Result<Vec<AgentInfo>, String> {
     let dir = state
         .project_dir
         .lock()
@@ -445,13 +508,24 @@ fn discover_agents(state: State<AppState>) -> Result<Vec<String>, String> {
 
     if let Ok(entries) = std::fs::read_dir(&agents_dir) {
         for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".md") {
-                agents.push(name.trim_end_matches(".md").to_string());
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !file_name.ends_with(".md") {
+                continue;
             }
+            let slug = file_name.trim_end_matches(".md").to_string();
+            let content = std::fs::read_to_string(entry.path()).unwrap_or_default();
+            let fm = parse_frontmatter(&content);
+
+            agents.push(AgentInfo {
+                name: fm.get("name").cloned().unwrap_or_else(|| slug.clone()),
+                description: fm.get("description").cloned().unwrap_or_default(),
+                model: fm.get("model").cloned().unwrap_or_else(|| "sonnet".to_string()),
+                slug,
+            });
         }
     }
 
+    agents.sort_by(|a, b| a.slug.cmp(&b.slug));
     Ok(agents)
 }
 
@@ -705,7 +779,16 @@ async fn run_claude_prompt(
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to start Claude Code: {}", e))?;
+        .map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("No such file") || msg.contains("not found") {
+                "Claude Code를 찾을 수 없습니다. 다시 설치해볼까요?".to_string()
+            } else if msg.contains("Permission denied") || msg.contains("EACCES") {
+                "접근 권한이 필요합니다. 시스템 설정을 확인해주세요.".to_string()
+            } else {
+                format!("Claude Code 실행에 실패했습니다: {}", msg)
+            }
+        })?;
 
     // Track child PID for stop_claude
     if let Some(pid) = child.id() {
@@ -744,12 +827,19 @@ async fn run_claude_prompt(
     *state.child_pid.lock().unwrap() = None;
 
     // If claude failed and stdout is empty, use stderr as error message
+    // Translate common errors to user-friendly messages
     let final_output = if !status.success() && full_output.trim().is_empty() {
         let err_msg = stderr_output.trim();
-        if !err_msg.is_empty() {
-            err_msg.to_string()
+        if err_msg.is_empty() {
+            "Claude Code에서 오류가 발생했습니다. 다시 시도해주세요.".to_string()
+        } else if err_msg.contains("401") || err_msg.contains("Unauthorized") || err_msg.contains("unauthorized") {
+            "로그인이 필요합니다. Claude Code에서 로그인해주세요.".to_string()
+        } else if err_msg.contains("429") || err_msg.contains("rate") || err_msg.contains("Rate") {
+            "요청이 많습니다. 잠시 후 다시 시도해주세요.".to_string()
+        } else if err_msg.contains("ECONNREFUSED") || err_msg.contains("Connection refused") || err_msg.contains("network") {
+            "인터넷 연결을 확인해주세요.".to_string()
         } else {
-            "Claude Code exited with an error.".to_string()
+            err_msg.to_string()
         }
     } else {
         full_output.trim().to_string()

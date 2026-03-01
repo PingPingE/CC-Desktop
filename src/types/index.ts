@@ -39,21 +39,19 @@ export interface Project {
   templateInstalled?: string;
 }
 
-/** A skill (slash command) discovered from .claude/skills/ */
-export interface Skill {
+/** Agent info from Rust backend (parsed from .claude/agents/) */
+export interface AgentInfo {
+  slug: string;
   name: string;
-  description?: string;
-  filePath: string;
+  description: string;
+  model: string;
 }
 
-/** An agent discovered from .claude/agents/ */
-export interface Agent {
+/** Skill info from Rust backend (parsed from .claude/skills/) */
+export interface SkillInfo {
+  slug: string;
   name: string;
-  description?: string;
-  model?: string;
-  tools?: string[];
-  permissionMode?: string;
-  filePath: string;
+  description: string;
 }
 
 
@@ -94,19 +92,3 @@ export interface InstallProgressEvent {
   stage: "downloading" | "installing" | "done";
 }
 
-/** Remote session connection */
-export interface RemoteSession {
-  id: string;
-  host: string;
-  port: number;
-  status: "connecting" | "connected" | "disconnected" | "error";
-  projectPath?: string;
-}
-
-/** Team composition — parsed from .claude/ directory */
-export interface TeamComposition {
-  agents: Agent[];
-  skills: Skill[];
-  hasTemplate: boolean;
-  templateName?: string;
-}

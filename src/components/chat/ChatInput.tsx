@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import type { ProcessState } from "@/types";
+import { useState, useRef, useEffect, useMemo } from "react";
+import type { ProcessState, SkillInfo } from "@/types";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
@@ -7,13 +7,33 @@ interface ChatInputProps {
   processState: ProcessState;
   onStop: () => void;
   onClear?: () => void;
+  skills?: SkillInfo[];
 }
 
-export function ChatInput({ onSend, disabled, processState, onStop, onClear }: ChatInputProps) {
+// Default commands when no skills are discovered
+const DEFAULT_COMMANDS = [
+  { name: "/plan-feature", desc: "Break a feature into tasks" },
+  { name: "/implement", desc: "Quick implementation" },
+  { name: "/code-review", desc: "Security + quality review" },
+  { name: "/refactor", desc: "Optimize without behavior change" },
+];
+
+export function ChatInput({ onSend, disabled, processState, onStop, onClear, skills }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isRunning = processState === "running";
+
+  // Build command list from discovered skills or fallback to defaults
+  const commands = useMemo(() => {
+    if (skills && skills.length > 0) {
+      return skills.map((s) => ({
+        name: `/${s.slug}`,
+        desc: s.description || s.name,
+      }));
+    }
+    return DEFAULT_COMMANDS;
+  }, [skills]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -25,9 +45,9 @@ export function ChatInput({ onSend, disabled, processState, onStop, onClear }: C
 
   // Show slash command palette when typing "/"
   useEffect(() => {
-    if (input === "/") {
+    if (input.startsWith("/")) {
       setShowCommands(true);
-    } else if (!input.startsWith("/")) {
+    } else {
       setShowCommands(false);
     }
   }, [input]);
@@ -49,17 +69,8 @@ export function ChatInput({ onSend, disabled, processState, onStop, onClear }: C
     }
   };
 
-  const commands = [
-    { name: "/plan-feature", desc: "Break a feature into tasks" },
-    { name: "/implement", desc: "Quick implementation" },
-    { name: "/code-review", desc: "Security + quality review" },
-    { name: "/refactor", desc: "Optimize without behavior change" },
-    { name: "/auto-fix", desc: "Fix build/lint/type errors" },
-    { name: "/ship", desc: "Pre-ship verification" },
-  ];
-
   const filteredCommands = commands.filter((cmd) =>
-    cmd.name.startsWith(input.toLowerCase())
+    cmd.name.toLowerCase().startsWith(input.toLowerCase())
   );
 
   return (

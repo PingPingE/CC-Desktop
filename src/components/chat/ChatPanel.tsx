@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { ChatMessage, ProcessState, Project } from "@/types";
+import type { ChatMessage, ProcessState, Project, SkillInfo } from "@/types";
 import { ChatInput } from "./ChatInput";
 import { MessageBubble } from "./MessageBubble";
 
@@ -16,6 +16,7 @@ interface ChatPanelProps {
   recentProjects: Project[];
   onSelectRecentProject: (project: Project) => void;
   onStop: () => void;
+  skills?: SkillInfo[];
 }
 
 export function ChatPanel({
@@ -29,6 +30,7 @@ export function ChatPanel({
   recentProjects,
   onSelectRecentProject,
   onStop,
+  skills,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (!project) return [];
@@ -227,6 +229,7 @@ export function ChatPanel({
         processState={processState}
         onStop={onStop}
         onClear={messages.length > 0 ? handleClearChat : undefined}
+        skills={skills}
       />
     </div>
   );

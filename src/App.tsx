@@ -3,11 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { HeaderBar } from "./components/header/HeaderBar";
 import { ProjectBar } from "./components/project/ProjectBar";
 import { ChatPanel } from "./components/chat/ChatPanel";
+import { TeamPanel } from "./components/team/TeamPanel";
 import { ActivityBar } from "./components/activity/ActivityBar";
 import { PermissionDialog } from "./components/permissions/PermissionDialog";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
-import type { Project, ProcessState, PermissionRequest } from "./types";
+import type { Project, ProcessState, PermissionRequest, AgentInfo, SkillInfo } from "./types";
 
 const RECENT_PROJECTS_KEY = "cc-desktop-recent-projects";
 const MAX_RECENT = 5;
@@ -50,6 +51,8 @@ function App() {
   const [projectAnalysis, setProjectAnalysis] = useState<ProjectAnalysis | null>(null);
   const [autoApprove, setAutoApprove] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     try {
       return (localStorage.getItem("cc-desktop-theme") as "light" | "dark") || "light";
@@ -74,12 +77,20 @@ function App() {
     await invoke("set_project_dir", { path: project.path });
     setCurrentProject(project);
 
-    // Analyze project automatically
+    // Analyze project and discover team
     try {
-      const analysis = await invoke<ProjectAnalysis>("analyze_project");
+      const [analysis, discoveredAgents, discoveredSkills] = await Promise.all([
+        invoke<ProjectAnalysis>("analyze_project"),
+        invoke<AgentInfo[]>("discover_agents"),
+        invoke<SkillInfo[]>("discover_skills"),
+      ]);
       setProjectAnalysis(analysis);
+      setAgents(discoveredAgents);
+      setSkills(discoveredSkills);
     } catch {
       setProjectAnalysis(null);
+      setAgents([]);
+      setSkills([]);
     }
 
     setRecentProjects((prev) => {
@@ -180,8 +191,28 @@ function App() {
             recentProjects={recentProjects}
             onSelectRecentProject={handleProjectSelect}
             onStop={handleStop}
+            skills={skills}
           />
         </div>
+
+        {currentProject && (agents.length > 0 || skills.length > 0) && (
+          <TeamPanel
+            agents={agents}
+            skills={skills}
+            onSkillClick={(slug) => {
+              // Will be wired to ChatInput to auto-fill the command
+              const input = document.querySelector<HTMLTextAreaElement>(".chat-textarea");
+              if (input) {
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                  window.HTMLTextAreaElement.prototype, "value"
+                )?.set;
+                nativeInputValueSetter?.call(input, `/${slug} `);
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+                input.focus();
+              }
+            }}
+          />
+        )}
       </div>
 
       <ActivityBar processState={processState} text={activityText} onStop={handleStop} />
