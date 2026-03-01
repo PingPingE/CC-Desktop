@@ -1,4 +1,5 @@
 import type { ProcessState } from "@/types";
+import { useLocale } from "../../i18n";
 
 interface ActivityBarProps {
   processState: ProcessState;
@@ -7,6 +8,7 @@ interface ActivityBarProps {
 }
 
 export function ActivityBar({ processState, text, onStop }: ActivityBarProps) {
+  const { t } = useLocale();
   const isWorking = processState === "running" || processState === "starting";
 
   return (
@@ -14,16 +16,16 @@ export function ActivityBar({ processState, text, onStop }: ActivityBarProps) {
       {isWorking && <div className="activity-spinner" />}
       <span className="activity-text">
         {isWorking
-          ? text || "Claude is working..."
+          ? text || t("activity.working")
           : processState === "error"
-            ? "Something went wrong. Try again."
+            ? t("activity.error")
             : processState === "stopped"
-              ? "Stopped."
-              : "Ready"}
+              ? t("activity.stopped")
+              : t("activity.ready")}
       </span>
       {isWorking && onStop && (
         <button className="activity-stop-btn" onClick={onStop}>
-          Stop
+          {t("activity.stop")}
         </button>
       )}
     </div>

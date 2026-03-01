@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { ChatMessage, ProcessState, Project, SkillInfo } from "@/types";
 import { ChatInput } from "./ChatInput";
 import { MessageBubble } from "./MessageBubble";
+import { useLocale } from "../../i18n";
 
 interface ChatPanelProps {
   project: Project | null;
@@ -210,6 +211,7 @@ export function ChatPanel({
             onCreateProject={onCreateProject}
             recentProjects={recentProjects}
             onSelectRecentProject={onSelectRecentProject}
+            skills={skills}
           />
         ) : (
           messages.map((msg) => (
@@ -241,6 +243,7 @@ interface WelcomeScreenProps {
   onCreateProject: (name: string) => void;
   recentProjects: Project[];
   onSelectRecentProject: (project: Project) => void;
+  skills?: SkillInfo[];
 }
 
 function WelcomeScreen({
@@ -249,7 +252,9 @@ function WelcomeScreen({
   onCreateProject,
   recentProjects,
   onSelectRecentProject,
+  skills,
 }: WelcomeScreenProps) {
+  const { t } = useLocale();
   const [showCreate, setShowCreate] = useState(false);
   const [projectName, setProjectName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -267,17 +272,34 @@ function WelcomeScreen({
   };
 
   if (hasProject) {
+    const hasSkills = skills && skills.length > 0;
+
     return (
       <div className="welcome-screen">
         <div className="welcome-icon">CC</div>
-        <h2>What do you want to build?</h2>
-        <p>Type a message below, or try a command:</p>
-        <div className="command-suggestions">
-          <code>/plan-feature</code>
-          <code>/implement</code>
-          <code>/code-review</code>
-          <code>/refactor</code>
-        </div>
+        <h2>{t("chat.welcome.withProject.title")}</h2>
+        {hasSkills ? (
+          <>
+            <p>{t("chat.welcome.withProject.subtitle")}</p>
+            <div className="command-suggestions">
+              {skills.map((s) => (
+                <code key={s.slug}>/{s.slug}</code>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="welcome-no-skills">
+            <p>{t("chat.welcome.withProject.noSkills")}</p>
+            <a
+              href="https://claudetemplate.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="welcome-skills-link"
+            >
+              {t("chat.welcome.withProject.getSkills")}
+            </a>
+          </div>
+        )}
       </div>
     );
   }
@@ -285,8 +307,8 @@ function WelcomeScreen({
   return (
     <div className="welcome-screen">
       <div className="welcome-icon">CC</div>
-      <h2>Welcome to CC Desktop</h2>
-      <p>Start something new, or continue where you left off.</p>
+      <h2>{t("chat.welcome.noProject.title")}</h2>
+      <p>{t("chat.welcome.noProject.subtitle")}</p>
 
       <div className="welcome-actions">
         {!showCreate ? (
@@ -294,22 +316,22 @@ function WelcomeScreen({
             <button className="welcome-action-btn welcome-action-primary" onClick={() => setShowCreate(true)}>
               <span className="welcome-action-icon">+</span>
               <span className="welcome-action-text">
-                <strong>Start a new project</strong>
-                <span>Create a folder and start building from scratch</span>
+                <strong>{t("chat.welcome.noProject.createNew")}</strong>
+                <span>{t("chat.welcome.noProject.createNewDesc")}</span>
               </span>
             </button>
 
             <button className="welcome-action-btn" onClick={onOpenProject}>
               <span className="welcome-action-icon">O</span>
               <span className="welcome-action-text">
-                <strong>Open existing folder</strong>
-                <span>I already have a project folder</span>
+                <strong>{t("chat.welcome.noProject.openExisting")}</strong>
+                <span>{t("chat.welcome.noProject.openExistingDesc")}</span>
               </span>
             </button>
           </>
         ) : (
           <div className="welcome-create-form">
-            <label className="welcome-create-label">What are you building?</label>
+            <label className="welcome-create-label">{t("chat.welcome.noProject.createLabel")}</label>
             <input
               ref={inputRef}
               className="welcome-create-input"
@@ -317,21 +339,21 @@ function WelcomeScreen({
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setShowCreate(false); }}
-              placeholder='e.g. "My Portfolio Website"'
+              placeholder={t("chat.welcome.noProject.createPlaceholder")}
             />
             <p className="welcome-create-hint">
-              A folder will be created at ~/Documents/CC-Projects/
+              {t("chat.welcome.noProject.createHint")}
             </p>
             <div className="welcome-create-actions">
               <button className="welcome-create-cancel" onClick={() => setShowCreate(false)}>
-                Cancel
+                {t("chat.welcome.noProject.cancel")}
               </button>
               <button
                 className="welcome-create-submit"
                 onClick={handleCreate}
                 disabled={!projectName.trim()}
               >
-                Create & Start
+                {t("chat.welcome.noProject.createAndStart")}
               </button>
             </div>
           </div>
@@ -340,7 +362,7 @@ function WelcomeScreen({
 
       {recentProjects.length > 0 && (
         <div className="recent-projects">
-          <span className="recent-projects-label">Recent</span>
+          <span className="recent-projects-label">{t("chat.welcome.noProject.recent")}</span>
           {recentProjects.map((p) => (
             <button
               key={p.path}

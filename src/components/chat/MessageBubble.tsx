@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { ChatMessage } from "@/types";
+import { useLocale } from "../../i18n";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -11,6 +12,7 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
+  const { t } = useLocale();
   const isUser = message.role === "user";
   const isStreaming = message.status === "streaming";
   const isError = message.status === "error";
@@ -25,11 +27,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
       {/* Message content */}
       <div className="message-content">
         {isStreaming && !message.content ? (
-          <span className="typing-indicator">
-            <span />
-            <span />
-            <span />
-          </span>
+          <ThinkingIndicator timestamp={message.timestamp} />
         ) : isUser ? (
           // User messages: plain text
           <div>{message.content}</div>
@@ -56,7 +54,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
               <span className="tool-type">{tc.tool}</span>
               <span className="tool-desc">{tc.description}</span>
               {tc.status === "pending" && (
-                <span className="tool-pending">Waiting for approval...</span>
+                <span className="tool-pending">{t("message.toolWaiting")}</span>
               )}
             </div>
           ))}
@@ -69,7 +67,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
           className="message-retry-btn"
           onClick={() => onRetry(message.content)}
         >
-          Retry
+          {t("message.retry")}
         </button>
       )}
 
@@ -85,6 +83,38 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
 }
 
 /**
+ * Thinking indicator with elapsed time — replaces the old three-dot animation
+ */
+function ThinkingIndicator({ timestamp }: { timestamp: number }) {
+  const { t } = useLocale();
+  const [elapsed, setElapsed] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - timestamp) / 1000));
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [timestamp]);
+
+  let text = t("message.thinking");
+  if (elapsed >= 30) {
+    text = t("message.thinkingLong");
+  } else if (elapsed >= 3) {
+    text = t("message.thinkingElapsed", { seconds: elapsed });
+  }
+
+  return (
+    <div className="thinking-indicator">
+      <div className="thinking-spinner" />
+      <span className="thinking-text">{text}</span>
+    </div>
+  );
+}
+
+/**
  * Code block component — inline code or fenced code blocks with syntax highlighting
  */
 function CodeBlock({
@@ -92,6 +122,7 @@ function CodeBlock({
   children,
   ...props
 }: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode; node?: unknown }) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "";
@@ -121,7 +152,7 @@ function CodeBlock({
       <div className="code-block-header">
         <span className="code-block-lang">{language || "text"}</span>
         <button className="code-block-copy" onClick={handleCopy}>
-          {copied ? "Copied!" : "Copy"}
+          {copied ? t("message.copied") : t("message.copy")}
         </button>
       </div>
       <SyntaxHighlighter

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import type { ProcessState, SkillInfo } from "@/types";
+import { useLocale } from "../../i18n";
 
 interface ChatInputProps {
   onSend: (content: string) => void;
@@ -19,6 +20,7 @@ const DEFAULT_COMMANDS = [
 ];
 
 export function ChatInput({ onSend, disabled, processState, onStop, onClear, skills }: ChatInputProps) {
+  const { t } = useLocale();
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -105,16 +107,16 @@ export function ChatInput({ onSend, disabled, processState, onStop, onClear, ski
           placeholder={
             disabled
               ? isRunning
-                ? "Claude is working..."
-                : "Open a project to start"
-              : 'Type a message or "/" for commands...'
+                ? t("chatInput.placeholder.working")
+                : t("chatInput.placeholder.noProject")
+              : t("chatInput.placeholder.ready")
           }
           disabled={disabled}
           rows={1}
         />
         {isRunning ? (
           <button className="stop-btn" onClick={onStop}>
-            Stop
+            {t("chatInput.stop")}
           </button>
         ) : (
           <button
@@ -122,21 +124,21 @@ export function ChatInput({ onSend, disabled, processState, onStop, onClear, ski
             onClick={handleSubmit}
             disabled={!input.trim() || disabled}
           >
-            Send
+            {t("chatInput.send")}
           </button>
         )}
       </div>
 
       <div className="chat-input-hint">
         {isRunning ? (
-          <span>Claude is working... press Stop to interrupt</span>
+          <span>{t("chatInput.hint.working")}</span>
         ) : (
           <span>
-            Enter to send, Shift+Enter for new line, / for commands
+            {t("chatInput.hint.ready")}
             {onClear && (
               <>
                 {" · "}
-                <button className="clear-chat-btn" onClick={onClear}>Clear chat</button>
+                <button className="clear-chat-btn" onClick={onClear}>{t("chatInput.clearChat")}</button>
               </>
             )}
           </span>

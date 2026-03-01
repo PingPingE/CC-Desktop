@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { PermissionRequest } from "@/types";
+import { useLocale } from "../../i18n";
 
 interface PermissionDialogProps {
   request: PermissionRequest;
@@ -12,6 +13,7 @@ export function PermissionDialog({
   onApprove,
   onDeny,
 }: PermissionDialogProps) {
+  const { t } = useLocale();
   const denyRef = useRef<HTMLButtonElement>(null);
 
   // Focus deny button on mount (safer default), trap Escape key
@@ -37,7 +39,7 @@ export function PermissionDialog({
     >
       <div className="permission-dialog">
         <div className="permission-header">
-          <h3 id="permission-title">Permission Required</h3>
+          <h3 id="permission-title">{t("permission.title")}</h3>
           <span className="permission-tool">{request.tool}</span>
         </div>
 
@@ -46,14 +48,14 @@ export function PermissionDialog({
 
           {request.command && (
             <div className="permission-detail">
-              <span className="detail-label">Command</span>
+              <span className="detail-label">{t("permission.command")}</span>
               <code>{request.command}</code>
             </div>
           )}
 
           {request.filePath && (
             <div className="permission-detail">
-              <span className="detail-label">File</span>
+              <span className="detail-label">{t("permission.file")}</span>
               <code>{request.filePath}</code>
             </div>
           )}
@@ -61,10 +63,10 @@ export function PermissionDialog({
 
         <div className="permission-actions">
           <button ref={denyRef} className="btn-deny" onClick={onDeny}>
-            Deny
+            {t("permission.deny")}
           </button>
           <button className="btn-approve" onClick={onApprove}>
-            Approve
+            {t("permission.approve")}
           </button>
         </div>
       </div>

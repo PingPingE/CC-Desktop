@@ -1,3 +1,5 @@
+import { useLocale } from "../../i18n";
+
 interface SettingsPanelProps {
   theme: "light" | "dark";
   onThemeChange: (theme: "light" | "dark") => void;
@@ -5,36 +7,48 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ theme, onThemeChange, onClose }: SettingsPanelProps) {
+  const { locale, setLocale, t } = useLocale();
+
   return (
     <>
       <div className="settings-overlay" onClick={onClose} />
       <div className="settings-drawer">
         <div className="settings-header">
-          <h3>Settings</h3>
+          <h3>{t("settings.title")}</h3>
           <button className="settings-close" onClick={onClose}>
             &times;
           </button>
         </div>
 
         <div className="setting-group">
-          <h4>Appearance</h4>
+          <h4>{t("settings.appearance")}</h4>
           <div className="setting-row">
-            <span>Theme</span>
+            <span>{t("settings.theme")}</span>
             <select
               value={theme}
               onChange={(e) => onThemeChange(e.target.value as "light" | "dark")}
             >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
+              <option value="light">{t("settings.theme.light")}</option>
+              <option value="dark">{t("settings.theme.dark")}</option>
+            </select>
+          </div>
+          <div className="setting-row">
+            <span>{t("settings.language")}</span>
+            <select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as "ko" | "en")}
+            >
+              <option value="ko">{t("settings.language.ko")}</option>
+              <option value="en">{t("settings.language.en")}</option>
             </select>
           </div>
         </div>
 
         <div className="setting-group">
-          <h4>About</h4>
+          <h4>{t("settings.about")}</h4>
           <div className="setting-about">
             <p><strong>CC Desktop</strong> v0.1.0</p>
-            <p>Desktop GUI for Claude Code</p>
+            <p>{t("settings.aboutDesc")}</p>
             <p className="setting-about-link">
               <a
                 href="https://claudetemplate.com"
@@ -59,12 +73,21 @@ export function SettingsPanel({ theme, onThemeChange, onClose }: SettingsPanelPr
         </div>
 
         <div className="setting-group">
-          <h4>Data</h4>
+          <h4>{t("settings.data")}</h4>
+          <button
+            className="setting-secondary-btn"
+            onClick={() => {
+              localStorage.removeItem("onboarding_completed");
+              window.location.reload();
+            }}
+          >
+            {t("settings.replayOnboarding")}
+          </button>
           <button
             className="setting-danger-btn"
             onClick={() => {
-              if (confirm("Clear all chat history and recent projects?")) {
-                // Clear all cc-chat-* and recent projects
+              if (confirm(t("settings.clearConfirm"))) {
+                // Clear all cc-chat-*, recent projects, and onboarding
                 const keysToRemove: string[] = [];
                 for (let i = 0; i < localStorage.length; i++) {
                   const key = localStorage.key(i);
@@ -73,11 +96,12 @@ export function SettingsPanel({ theme, onThemeChange, onClose }: SettingsPanelPr
                   }
                 }
                 keysToRemove.forEach((k) => localStorage.removeItem(k));
+                localStorage.removeItem("onboarding_completed");
                 window.location.reload();
               }
             }}
           >
-            Clear All Data
+            {t("settings.clearData")}
           </button>
         </div>
       </div>

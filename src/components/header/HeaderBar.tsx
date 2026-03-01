@@ -1,4 +1,5 @@
 import type { Project, ProcessState } from "@/types";
+import { useLocale } from "../../i18n";
 
 interface HeaderBarProps {
   project: Project | null;
@@ -17,13 +18,15 @@ export function HeaderBar({
   onOpenFolder,
   onToggleSettings,
 }: HeaderBarProps) {
+  const { t } = useLocale();
+
   const statusConfig: Record<ProcessState, { label: string; color: string }> = {
-    idle: { label: "Ready", color: "var(--success)" },
-    starting: { label: "Starting...", color: "var(--warning)" },
-    running: { label: "Working...", color: "var(--info)" },
-    waiting_permission: { label: "Waiting", color: "var(--warning)" },
-    error: { label: "Error", color: "var(--error)" },
-    stopped: { label: "Stopped", color: "var(--text-muted)" },
+    idle: { label: t("header.status.idle"), color: "var(--success)" },
+    starting: { label: t("header.status.starting"), color: "var(--warning)" },
+    running: { label: t("header.status.running"), color: "var(--info)" },
+    waiting_permission: { label: t("header.status.waiting_permission"), color: "var(--warning)" },
+    error: { label: t("header.status.error"), color: "var(--error)" },
+    stopped: { label: t("header.status.stopped"), color: "var(--text-muted)" },
   };
 
   const { label, color } = statusConfig[processState];
@@ -41,7 +44,7 @@ export function HeaderBar({
             <span className="header-project-path">{project.path}</span>
           </>
         ) : (
-          <span className="header-no-project">No project open</span>
+          <span className="header-no-project">{t("header.noProject")}</span>
         )}
       </div>
 
@@ -56,20 +59,20 @@ export function HeaderBar({
             className={`auto-approve-toggle ${autoApprove ? "auto-approve-on" : ""}`}
             onClick={() => onAutoApproveChange(!autoApprove)}
             title={autoApprove
-              ? "Auto-approve ON: Claude works freely without asking permission"
-              : "Auto-approve OFF: Claude asks before each action"
+              ? t("header.autoApprove.onTitle")
+              : t("header.autoApprove.offTitle")
             }
           >
             <span className="auto-approve-dot" />
-            <span>{autoApprove ? "Auto" : "Ask"}</span>
+            <span>{autoApprove ? t("header.autoApprove.on") : t("header.autoApprove.off")}</span>
           </button>
         )}
 
         <button className="header-btn" onClick={onOpenFolder}>
-          {project ? "Switch" : "Open"}
+          {project ? t("header.switch") : t("header.open")}
         </button>
         <button className="header-btn" onClick={onToggleSettings}>
-          Settings
+          {t("header.settings")}
         </button>
       </div>
     </header>

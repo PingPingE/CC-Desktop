@@ -1,18 +1,21 @@
 import type { ProjectAnalysis } from "@/App";
+import { useLocale } from "../../i18n";
 
 interface ProjectBarProps {
   analysis: ProjectAnalysis;
 }
 
 export function ProjectBar({ analysis }: ProjectBarProps) {
+  const { t } = useLocale();
+
   const techLabel = analysis.framework
     ? `${analysis.framework} (${analysis.languages[0]})`
     : analysis.languages.join(", ");
 
   const teamLabel =
     analysis.agent_count > 0 || analysis.skill_count > 0
-      ? `${analysis.agent_count} agents, ${analysis.skill_count} skills`
-      : "No team";
+      ? t("projectBar.team", { agents: analysis.agent_count, skills: analysis.skill_count })
+      : t("projectBar.noTeam");
 
   return (
     <div className="project-bar">

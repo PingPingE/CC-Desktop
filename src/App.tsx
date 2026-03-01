@@ -8,6 +8,7 @@ import { ActivityBar } from "./components/activity/ActivityBar";
 import { PermissionDialog } from "./components/permissions/PermissionDialog";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
+import { LocaleProvider, useLocale } from "./i18n";
 import type { Project, ProcessState, PermissionRequest, AgentInfo, SkillInfo } from "./types";
 
 const RECENT_PROJECTS_KEY = "cc-desktop-recent-projects";
@@ -38,7 +39,8 @@ function saveRecentProjects(projects: Project[]) {
   localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(projects.slice(0, MAX_RECENT)));
 }
 
-function App() {
+function AppInner() {
+  const { t } = useLocale();
   const [onboardingDone, setOnboardingDone] = useState(
     localStorage.getItem("onboarding_completed") === "true"
   );
@@ -149,7 +151,7 @@ function App() {
     return (
       <div className="app-loading" data-theme={theme}>
         <div className="loading-spinner" />
-        <p>Starting CC Desktop...</p>
+        <p>{t("loading.starting")}</p>
       </div>
     );
   }
@@ -233,6 +235,14 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <LocaleProvider>
+      <AppInner />
+    </LocaleProvider>
   );
 }
 

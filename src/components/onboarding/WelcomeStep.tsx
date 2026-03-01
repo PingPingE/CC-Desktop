@@ -1,20 +1,43 @@
+import { useLocale } from "../../i18n";
+
 interface WelcomeStepProps {
   onNext: () => void;
 }
 
 export function WelcomeStep({ onNext }: WelcomeStepProps) {
+  const { locale, setLocale, t } = useLocale();
+
   return (
     <div className="onboarding-wizard-step">
       <div className="wizard-logo">CC</div>
-      <h1>CC Desktop</h1>
+      <h1>{t("onboarding.welcome.title")}</h1>
       <p className="wizard-subtitle">
-        Claude Code를 터미널 없이 사용하세요
+        {t("onboarding.welcome.subtitle")}
       </p>
       <p className="wizard-desc">
-        코딩, 파일 편집, 프로젝트 관리를 대화형으로 — 개발 경험이 없어도 괜찮습니다.
+        {t("onboarding.welcome.desc")}
       </p>
+
+      <div className="wizard-lang-selector">
+        <span className="wizard-lang-label">{t("onboarding.welcome.langLabel")}</span>
+        <div className="wizard-lang-options">
+          <button
+            className={`wizard-lang-btn ${locale === "ko" ? "wizard-lang-active" : ""}`}
+            onClick={() => setLocale("ko")}
+          >
+            한국어
+          </button>
+          <button
+            className={`wizard-lang-btn ${locale === "en" ? "wizard-lang-active" : ""}`}
+            onClick={() => setLocale("en")}
+          >
+            English
+          </button>
+        </div>
+      </div>
+
       <button className="wizard-btn-primary" onClick={onNext}>
-        시작하기
+        {t("onboarding.welcome.start")}
       </button>
     </div>
   );
